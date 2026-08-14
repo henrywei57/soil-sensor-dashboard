@@ -22,32 +22,55 @@
             box-sizing: border-box;
         }
 
+
         body {
+
             margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
             background: #f4f6f8;
+
             color: #1f2937;
+
         }
+
 
         /* =========================
            HEADER
         ========================= */
 
         header {
+
             background: #1f2937;
+
             color: white;
+
             padding: 35px 20px;
+
             text-align: center;
+
         }
+
 
         header h1 {
+
             margin: 0;
+
             font-size: 34px;
+
         }
 
+
         header p {
+
             margin: 10px 0 0;
+
             opacity: 0.75;
+
         }
 
 
@@ -56,9 +79,13 @@
         ========================= */
 
         #status {
+
             text-align: center;
+
             padding: 18px;
+
             color: #6b7280;
+
         }
 
 
@@ -67,8 +94,11 @@
         ========================= */
 
         .latest-container {
+
             max-width: 1400px;
+
             margin: auto;
+
             padding: 0 30px 30px;
 
             display: grid;
@@ -77,26 +107,42 @@
                 repeat(auto-fit, minmax(180px, 1fr));
 
             gap: 15px;
+
         }
 
+
         .stat-card {
+
             background: white;
+
             border-radius: 12px;
+
             padding: 20px;
 
             box-shadow:
-                0 3px 12px rgba(0, 0, 0, 0.08);
+                0 3px 12px
+                rgba(0, 0, 0, 0.08);
+
         }
+
 
         .stat-label {
+
             font-size: 13px;
+
             color: #6b7280;
+
             margin-bottom: 8px;
+
         }
 
+
         .stat-value {
+
             font-size: 25px;
+
             font-weight: bold;
+
         }
 
 
@@ -105,7 +151,9 @@
         ========================= */
 
         .dashboard {
+
             max-width: 1400px;
+
             margin: auto;
 
             padding: 0 30px 40px;
@@ -116,9 +164,12 @@
                 repeat(auto-fit, minmax(420px, 1fr));
 
             gap: 25px;
+
         }
 
+
         .chart-card {
+
             background: white;
 
             padding: 22px;
@@ -126,17 +177,27 @@
             border-radius: 12px;
 
             box-shadow:
-                0 3px 12px rgba(0, 0, 0, 0.08);
+                0 3px 12px
+                rgba(0, 0, 0, 0.08);
+
         }
+
 
         .chart-card h2 {
+
             margin: 0 0 20px;
+
             font-size: 19px;
+
         }
 
+
         .chart-container {
+
             position: relative;
+
             height: 300px;
+
         }
 
 
@@ -145,6 +206,7 @@
         ========================= */
 
         #error {
+
             display: none;
 
             max-width: 900px;
@@ -158,6 +220,7 @@
             color: #991b1b;
 
             border-radius: 10px;
+
         }
 
 
@@ -168,16 +231,25 @@
         @media (max-width: 600px) {
 
             header h1 {
+
                 font-size: 26px;
+
             }
+
 
             .dashboard {
+
                 grid-template-columns: 1fr;
+
                 padding: 0 15px 30px;
+
             }
 
+
             .latest-container {
+
                 padding: 0 15px 20px;
+
             }
 
         }
@@ -210,7 +282,9 @@
 ========================= -->
 
 <div id="status">
+
     Loading Google Sheet...
+
 </div>
 
 
@@ -260,6 +334,119 @@ const charts = {};
 
 
 // ============================================================
+// ROUND NUMBERS
+// ============================================================
+
+function roundNumber(value, decimals = 2) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
+        return null;
+
+    }
+
+
+    const number =
+        Number(value);
+
+
+    if (!Number.isFinite(number)) {
+
+        return value;
+
+    }
+
+
+    return Number(
+        number.toFixed(decimals)
+    );
+
+}
+
+
+// ============================================================
+// FORMAT NUMBER FOR DISPLAY
+// ============================================================
+
+function formatNumber(value) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
+        return "N/A";
+
+    }
+
+
+    const number =
+        Number(value);
+
+
+    if (!Number.isFinite(number)) {
+
+        return value;
+
+    }
+
+
+    /*
+        Automatically choose a reasonable
+        number of decimal places.
+
+        >= 1000   → whole number
+        >= 100    → 1 decimal
+        >= 10     → 2 decimals
+        >= 1      → 2 decimals
+        < 1       → 3 decimals
+    */
+
+    let decimals;
+
+
+    const absolute =
+        Math.abs(number);
+
+
+    if (absolute >= 1000) {
+
+        decimals = 0;
+
+    }
+
+    else if (absolute >= 100) {
+
+        decimals = 1;
+
+    }
+
+    else if (absolute >= 1) {
+
+        decimals = 2;
+
+    }
+
+    else {
+
+        decimals = 3;
+
+    }
+
+
+    return Number(
+        number.toFixed(decimals)
+    ).toString();
+
+}
+
+
+// ============================================================
 // LOAD GOOGLE SHEET
 // ============================================================
 
@@ -267,7 +454,9 @@ async function loadGoogleSheet() {
 
     try {
 
-        showStatus("Downloading latest Google Sheet data...");
+        showStatus(
+            "Downloading latest Google Sheet data..."
+        );
 
         hideError();
 
@@ -277,7 +466,9 @@ async function loadGoogleSheet() {
         // ----------------------------------------------------
 
         const response =
-            await fetch(GOOGLE_SHEET_URL);
+            await fetch(
+                GOOGLE_SHEET_URL
+            );
 
 
         if (!response.ok) {
@@ -291,10 +482,6 @@ async function loadGoogleSheet() {
 
         // ----------------------------------------------------
         // Convert response into ArrayBuffer
-        //
-        // IMPORTANT:
-        // Do NOT use Buffer.from()
-        // because Buffer is Node.js-only.
         // ----------------------------------------------------
 
         const arrayBuffer =
@@ -302,15 +489,18 @@ async function loadGoogleSheet() {
 
 
         // ----------------------------------------------------
-        // Read XLSX with SheetJS
+        // Read XLSX
         // ----------------------------------------------------
 
         const workbook =
             XLSX.read(
+
                 arrayBuffer,
+
                 {
                     type: "array"
                 }
+
             );
 
 
@@ -329,7 +519,9 @@ async function loadGoogleSheet() {
 
 
         const worksheet =
-            workbook.Sheets[sheetName];
+            workbook.Sheets[
+                sheetName
+            ];
 
 
         if (!worksheet) {
@@ -342,15 +534,18 @@ async function loadGoogleSheet() {
 
 
         // ----------------------------------------------------
-        // Convert worksheet into JavaScript objects
+        // Convert worksheet to JSON
         // ----------------------------------------------------
 
         const data =
             XLSX.utils.sheet_to_json(
+
                 worksheet,
+
                 {
                     defval: null
                 }
+
             );
 
 
@@ -380,16 +575,23 @@ async function loadGoogleSheet() {
 
 
         // ----------------------------------------------------
-        // Display dashboard
+        // Create dashboard
         // ----------------------------------------------------
 
-        createLatestValues(data);
+        createLatestValues(
+            data
+        );
 
-        createGraphs(data);
+
+        createGraphs(
+            data
+        );
 
 
         showStatus(
+
             `Loaded ${data.length} measurements • Last updated ${new Date().toLocaleTimeString()}`
+
         );
 
 
@@ -425,44 +627,55 @@ async function loadGoogleSheet() {
 function findTimeColumn(data) {
 
     const columns =
-        Object.keys(data[0]);
+        Object.keys(
+            data[0]
+        );
 
 
-    // Look for exact "Time"
-
-    if (columns.includes("Time")) {
+    if (
+        columns.includes(
+            "Time"
+        )
+    ) {
 
         return "Time";
 
     }
 
 
-    // Look for a column containing "time"
-
     const timeColumn =
         columns.find(
+
             column =>
                 column
                     .toLowerCase()
                     .includes("time")
+
         );
 
 
-    return timeColumn || columns[0];
+    return (
+        timeColumn ||
+        columns[0]
+    );
 
 }
 
 
 // ============================================================
-// CHECK IF VALUE IS NUMERIC
+// CHECK IF NUMERIC
 // ============================================================
 
 function isNumeric(value) {
 
     if (
+
         value === null ||
+
         value === undefined ||
+
         value === ""
+
     ) {
 
         return false;
@@ -474,7 +687,9 @@ function isNumeric(value) {
         Number(value);
 
 
-    return Number.isFinite(number);
+    return Number.isFinite(
+        number
+    );
 
 }
 
@@ -486,34 +701,48 @@ function isNumeric(value) {
 function findNumericColumns(data) {
 
     const columns =
-        Object.keys(data[0]);
+        Object.keys(
+            data[0]
+        );
 
 
     const timeColumn =
-        findTimeColumn(data);
+        findTimeColumn(
+            data
+        );
 
 
     return columns.filter(
+
         column => {
 
+
             // Don't graph Time
-            if (column === timeColumn) {
+
+            if (
+                column === timeColumn
+            ) {
 
                 return false;
 
             }
 
 
-            // Look through the data
-
             const values =
                 data
-                    .map(row => row[column])
+
+                    .map(
+                        row =>
+                            row[column]
+                    )
+
                     .filter(
+
                         value =>
                             value !== null &&
                             value !== undefined &&
                             value !== ""
+
                     );
 
 
@@ -524,9 +753,6 @@ function findNumericColumns(data) {
             }
 
 
-            // Column is numeric if
-            // most values are numbers
-
             const numericCount =
                 values.filter(
                     isNumeric
@@ -534,23 +760,26 @@ function findNumericColumns(data) {
 
 
             return (
+
                 numericCount /
                 values.length
+
             ) >= 0.5;
 
         }
+
     );
 
 }
 
 
 // ============================================================
-// GET UNIT FROM COLUMN NAME
+// GET UNIT
 // ============================================================
 
-function getUnit(columnName) {
-
-    // Extract anything inside parentheses
+function getUnit(
+    columnName
+) {
 
     const match =
         columnName.match(
@@ -574,25 +803,29 @@ function getUnit(columnName) {
 // GET CLEAN LABEL
 // ============================================================
 
-function getLabel(columnName) {
-
-    // Remove unit from label
+function getLabel(
+    columnName
+) {
 
     return columnName
+
         .replace(
             /\s*\([^)]*\)/g,
             ""
         )
+
         .trim();
 
 }
 
 
 // ============================================================
-// CREATE LATEST VALUE CARDS
+// CREATE LATEST VALUES
 // ============================================================
 
-function createLatestValues(data) {
+function createLatestValues(
+    data
+) {
 
     const container =
         document.getElementById(
@@ -601,15 +834,21 @@ function createLatestValues(data) {
 
 
     const latest =
-        data[data.length - 1];
+        data[
+            data.length - 1
+        ];
 
 
     const timeColumn =
-        findTimeColumn(data);
+        findTimeColumn(
+            data
+        );
 
 
     const numericColumns =
-        findNumericColumns(data);
+        findNumericColumns(
+            data
+        );
 
 
     let html = "";
@@ -628,10 +867,12 @@ function createLatestValues(data) {
             </div>
 
             <div class="stat-value">
+
                 ${
                     latest[timeColumn] ??
                     "N/A"
                 }
+
             </div>
 
         </div>
@@ -640,18 +881,22 @@ function createLatestValues(data) {
 
 
     // ----------------------------------------------------
-    // Each measurement
+    // Measurements
     // ----------------------------------------------------
 
     numericColumns.forEach(
+
         column => {
+
 
             const value =
                 latest[column];
 
 
             const unit =
-                getUnit(column);
+                getUnit(
+                    column
+                );
 
 
             html += `
@@ -659,14 +904,18 @@ function createLatestValues(data) {
                 <div class="stat-card">
 
                     <div class="stat-label">
+
                         ${getLabel(column)}
+
                     </div>
+
 
                     <div class="stat-value">
 
                         ${
-                            value ??
-                            "N/A"
+                            formatNumber(
+                                value
+                            )
                         }
 
                         ${
@@ -682,6 +931,7 @@ function createLatestValues(data) {
             `;
 
         }
+
     );
 
 
@@ -692,10 +942,12 @@ function createLatestValues(data) {
 
 
 // ============================================================
-// CREATE ALL GRAPHS
+// CREATE GRAPHS
 // ============================================================
 
-function createGraphs(data) {
+function createGraphs(
+    data
+) {
 
     const dashboard =
         document.getElementById(
@@ -703,17 +955,20 @@ function createGraphs(data) {
         );
 
 
-    // Clear old graph containers
-
-    dashboard.innerHTML = "";
+    dashboard.innerHTML =
+        "";
 
 
     const timeColumn =
-        findTimeColumn(data);
+        findTimeColumn(
+            data
+        );
 
 
     const numericColumns =
-        findNumericColumns(data);
+        findNumericColumns(
+            data
+        );
 
 
     console.log(
@@ -722,26 +977,33 @@ function createGraphs(data) {
     );
 
 
-    // ----------------------------------------------------
-    // Create graph for every numeric column
-    // ----------------------------------------------------
-
     numericColumns.forEach(
-        (column, index) => {
+
+        (
+            column,
+            index
+        ) => {
+
 
             const chartID =
                 `chart_${index}`;
 
 
             const label =
-                getLabel(column);
+                getLabel(
+                    column
+                );
 
 
             const unit =
-                getUnit(column);
+                getUnit(
+                    column
+                );
 
 
+            // ------------------------------------------------
             // Create card
+            // ------------------------------------------------
 
             const card =
                 document.createElement(
@@ -756,11 +1018,17 @@ function createGraphs(data) {
             card.innerHTML = `
 
                 <h2>
+
                     ${getIcon(column)}
+
                     ${label}
+
                 </h2>
 
-                <div class="chart-container">
+
+                <div
+                    class="chart-container"
+                >
 
                     <canvas
                         id="${chartID}">
@@ -777,22 +1045,30 @@ function createGraphs(data) {
 
 
             // ------------------------------------------------
-            // X axis
+            // X values
             // ------------------------------------------------
 
             const labels =
                 data.map(
+
                     row =>
-                        row[timeColumn]
+                        row[
+                            timeColumn
+                        ]
+
                 );
 
 
             // ------------------------------------------------
-            // Y axis
+            // Y values
+            //
+            // Keep the actual data values
+            // for accurate graphs.
             // ------------------------------------------------
 
             const values =
                 data.map(
+
                     row => {
 
                         const value =
@@ -815,6 +1091,7 @@ function createGraphs(data) {
                         return null;
 
                     }
+
                 );
 
 
@@ -837,10 +1114,13 @@ function createGraphs(data) {
             );
 
         }
+
     );
 
 
-    if (!numericColumns.length) {
+    if (
+        !numericColumns.length
+    ) {
 
         dashboard.innerHTML = `
 
@@ -865,7 +1145,7 @@ function createGraphs(data) {
 
 
 // ============================================================
-// CREATE INDIVIDUAL CHART
+// CREATE CHART
 // ============================================================
 
 function createChart(
@@ -891,7 +1171,9 @@ function createChart(
 
     // Destroy old chart
 
-    if (charts[chartID]) {
+    if (
+        charts[chartID]
+    ) {
 
         charts[chartID].destroy();
 
@@ -919,9 +1201,14 @@ function createChart(
 
                             label:
                                 unit
+
                                     ? `${label} (${unit})`
+
                                     : label,
 
+
+                            // Use REAL values
+                            // for graph accuracy
 
                             data: values,
 
@@ -978,7 +1265,10 @@ function createChart(
                             callbacks: {
 
                                 label:
-                                    function(context) {
+                                    function(
+                                        context
+                                    ) {
+
 
                                         const value =
                                             context.parsed.y;
@@ -993,11 +1283,17 @@ function createChart(
                                         }
 
 
+                                        const rounded =
+                                            formatNumber(
+                                                value
+                                            );
+
+
                                         return unit
 
-                                            ? `${label}: ${value} ${unit}`
+                                            ? `${label}: ${rounded} ${unit}`
 
-                                            : `${label}: ${value}`;
+                                            : `${label}: ${rounded}`;
 
                                     }
 
@@ -1045,10 +1341,28 @@ function createChart(
 
                                 display: true,
 
+
                                 text:
+
                                     unit
+
                                         ? `${label} (${unit})`
+
                                         : label
+
+                            },
+
+
+                            ticks: {
+
+                                callback:
+                                    function(value) {
+
+                                        return formatNumber(
+                                            value
+                                        );
+
+                                    }
 
                             }
 
@@ -1066,17 +1380,21 @@ function createChart(
 
 
 // ============================================================
-// GET ICON
+// ICONS
 // ============================================================
 
-function getIcon(column) {
+function getIcon(
+    column
+) {
 
     const name =
         column.toLowerCase();
 
 
     if (
-        name.includes("moisture")
+        name.includes(
+            "moisture"
+        )
     ) {
 
         return "💧";
@@ -1085,7 +1403,9 @@ function getIcon(column) {
 
 
     if (
-        name.includes("temperature")
+        name.includes(
+            "temperature"
+        )
     ) {
 
         return "🌡️";
@@ -1094,8 +1414,13 @@ function getIcon(column) {
 
 
     if (
+
         name.includes("ec") ||
-        name.includes("conductivity")
+
+        name.includes(
+            "conductivity"
+        )
+
     ) {
 
         return "⚡";
@@ -1104,8 +1429,7 @@ function getIcon(column) {
 
 
     if (
-        name === "ph" ||
-        name.includes("pH")
+        name === "ph"
     ) {
 
         return "⚗️";
@@ -1114,7 +1438,9 @@ function getIcon(column) {
 
 
     if (
-        name.includes("nitrogen")
+        name.includes(
+            "nitrogen"
+        )
     ) {
 
         return "🧪";
@@ -1123,7 +1449,9 @@ function getIcon(column) {
 
 
     if (
-        name.includes("phosphorus")
+        name.includes(
+            "phosphorus"
+        )
     ) {
 
         return "🧬";
@@ -1132,7 +1460,9 @@ function getIcon(column) {
 
 
     if (
-        name.includes("potassium")
+        name.includes(
+            "potassium"
+        )
     ) {
 
         return "🍃";
@@ -1149,7 +1479,9 @@ function getIcon(column) {
 // STATUS
 // ============================================================
 
-function showStatus(message) {
+function showStatus(
+    message
+) {
 
     document.getElementById(
         "status"
@@ -1163,7 +1495,9 @@ function showStatus(message) {
 // ERROR
 // ============================================================
 
-function showError(message) {
+function showError(
+    message
+) {
 
     const error =
         document.getElementById(
