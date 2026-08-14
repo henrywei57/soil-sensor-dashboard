@@ -9,11 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js">
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS for XLSX parsing -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js">
-    </script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
     <style>
         :root {
@@ -219,21 +217,19 @@
             color: var(--accent-blue);
         }
 
-        /* Span 2 Columns for Charts */
-        .col-span-2 {
-            grid-column: span 2;
-        }
-        .col-span-4 {
-            grid-column: span 4;
-        }
+        /* Grid Column Spans */
+        .col-span-1 { grid-column: span 1; }
+        .col-span-2 { grid-column: span 2; }
+        .col-span-3 { grid-column: span 3; }
+        .col-span-4 { grid-column: span 4; }
 
         .chart-card {
-            min-height: 340px;
+            min-height: 320px;
         }
 
         .chart-container {
             position: relative;
-            height: 260px;
+            height: 240px;
             width: 100%;
         }
 
@@ -377,14 +373,11 @@
         }
 
         /* Responsiveness */
-        @media (max-width: 1024px) {
+        @media (max-width: 1200px) {
             .dashboard-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
-            .col-span-2 {
-                grid-column: span 2;
-            }
-            .col-span-4 {
+            .col-span-2, .col-span-3, .col-span-4 {
                 grid-column: span 2;
             }
         }
@@ -400,8 +393,7 @@
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
-            .col-span-2,
-            .col-span-4 {
+            .col-span-1, .col-span-2, .col-span-3, .col-span-4 {
                 grid-column: span 1;
             }
         }
@@ -462,7 +454,7 @@
                 <span class="card-title">Elect. Conductivity</span>
                 <span class="card-icon">⚡</span>
             </div>
-            <div class="card-value" id="valEC">-- uS/cm</div>
+            <div class="card-value" id="valEC">-- µS/cm</div>
             <div class="card-subtext">
                 Last: <span class="timestamp-badge" id="timeEC">--:--:--</span>
             </div>
@@ -480,14 +472,36 @@
             </div>
         </div>
 
-        <!-- Time Series Line Chart (Moisture, Temp, EC) -->
+        <!-- Individual Chart 1: Soil Moisture -->
         <div class="card col-span-2 chart-card">
             <div class="card-header">
-                <span class="card-title">Environmental Telemetry (Timestamped)</span>
-                <span class="timestamp-badge" id="chartRangeBadge">Live Feed</span>
+                <span class="card-title">Soil Moisture Trend (%)</span>
+                <span class="timestamp-badge" id="moistureChartBadge">Live Feed</span>
             </div>
             <div class="chart-container">
-                <canvas id="envChart"></canvas>
+                <canvas id="moistureChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Individual Chart 2: Temperature -->
+        <div class="card col-span-2 chart-card">
+            <div class="card-header">
+                <span class="card-title">Temperature Trend (°C)</span>
+                <span class="timestamp-badge" id="tempChartBadge">Live Feed</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Individual Chart 3: Electrical Conductivity -->
+        <div class="card col-span-2 chart-card">
+            <div class="card-header">
+                <span class="card-title">Electrical Conductivity (µS/cm)</span>
+                <span class="timestamp-badge" id="ecChartBadge">Live Feed</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="ecChart"></canvas>
             </div>
         </div>
 
@@ -560,10 +574,12 @@
             <div class="form-group">
                 <label for="refreshInterval">Auto Sync Frequency:</label>
                 <select id="refreshInterval">
+                    <option value="21600000" selected>Every 6 Hours</option>
                     <option value="5000">Every 5 Seconds</option>
-                    <option value="10000" selected>Every 10 Seconds</option>
+                    <option value="10000">Every 10 Seconds</option>
                     <option value="30000">Every 30 Seconds</option>
                     <option value="60000">Every 1 Minute</option>
+                    <option value="3600000">Every 1 Hour</option>
                 </select>
             </div>
 
@@ -586,51 +602,44 @@
         // ================================================================
         const HARDCODED_XLSX_URL =
             'https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/export?format=xlsx&gid=2009997265';
-
-        // Alternative "Publish to web" style (uncomment if needed):
-        // const HARDCODED_XLSX_URL =
-        //   'https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/pub?output=xlsx';
         // ================================================================
 
         // Configuration & State Management
         const STORAGE_KEY_INTERVAL = 'aiot_refresh_interval';
 
-        // Always use the hardcoded URL – completely locked.
+        // Locked URL
         const csvUrl = HARDCODED_XLSX_URL;
-        let syncInterval = parseInt(localStorage.getItem(STORAGE_KEY_INTERVAL) || '10000', 10);
+        // Default to 6 hours (21,600,000 milliseconds) as requested
+        let syncInterval = parseInt(localStorage.getItem(STORAGE_KEY_INTERVAL) || '21600000', 10);
         let syncTimer = null;
 
         // Charts references
-        let envChart = null;
+        let moistureChart = null;
+        let tempChart = null;
+        let ecChart = null;
         let npkChart = null;
 
         // ================================================================
-        //  TIMESTAMP FORMATTER — makes any timestamp human‑readable
+        //  TIMESTAMP FORMATTER — preserves accurate full timestamp from sheet
         // ================================================================
         function formatTimestamp(raw) {
-            if (!raw) return '--:--:--';
+            if (!raw && raw !== 0) return '--:--:--';
 
-            // If it's already a number (Excel serial or Unix ms), try to parse it.
             let d = null;
 
-            // Try as number (Excel serial or Unix timestamp)
-            if (typeof raw === 'number' || /^\d+$/.test(raw)) {
+            if (typeof raw === 'number' || /^\d+(\.\d+)?$/.test(raw)) {
                 const num = Number(raw);
-                // Excel serial: days since 1899-12-30, roughly 25569 days offset
                 if (num > 30000 && num < 60000) {
-                    // Excel date serial
+                    // Excel date serial format
                     const excelEpoch = new Date(1899, 11, 30);
                     d = new Date(excelEpoch.getTime() + num * 86400000);
                 } else if (num > 1e12) {
-                    // Milliseconds since Unix epoch
                     d = new Date(num);
                 } else if (num > 1e9 && num < 1e10) {
-                    // Seconds since Unix epoch
                     d = new Date(num * 1000);
                 }
             }
 
-            // Try parsing as string
             if (!d || isNaN(d.getTime())) {
                 const parsed = new Date(raw);
                 if (!isNaN(parsed.getTime())) {
@@ -638,29 +647,22 @@
                 }
             }
 
-            // If we have a valid date, format it nicely
             if (d && !isNaN(d.getTime())) {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-                ];
-                const mon = months[d.getMonth()];
-                const day = String(d.getDate()).padStart(2, '0');
-                const year = d.getFullYear();
                 const hh = String(d.getHours()).padStart(2, '0');
                 const mm = String(d.getMinutes()).padStart(2, '0');
                 const ss = String(d.getSeconds()).padStart(2, '0');
-                return `${mon} ${day}, ${year} · ${hh}:${mm}:${ss}`;
+                const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
+                const hh12 = String(d.getHours() % 12 || 12).padStart(2, '0');
+                return `${hh12}:${mm}:${ss} ${ampm}`;
             }
 
-            // Fallback: return the original string trimmed
             return String(raw).trim() || '--:--:--';
         }
 
-        // Short version for chart labels (time only, to keep x‑axis clean)
         function formatTimestampShort(raw) {
-            if (!raw) return '--:--';
+            if (!raw && raw !== 0) return '--:--';
             let d = null;
-            if (typeof raw === 'number' || /^\d+$/.test(raw)) {
+            if (typeof raw === 'number' || /^\d+(\.\d+)?$/.test(raw)) {
                 const num = Number(raw);
                 if (num > 30000 && num < 60000) {
                     const excelEpoch = new Date(1899, 11, 30);
@@ -676,16 +678,13 @@
                 if (!isNaN(parsed.getTime())) d = parsed;
             }
             if (d && !isNaN(d.getTime())) {
-                const hh = String(d.getHours()).padStart(2, '0');
+                const hh12 = String(d.getHours() % 12 || 12).padStart(2, '0');
                 const mm = String(d.getMinutes()).padStart(2, '0');
-                return `${hh}:${mm}`;
+                const ss = String(d.getSeconds()).padStart(2, '0');
+                const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
+                return `${hh12}:${mm}:${ss} ${ampm}`;
             }
-            const str = String(raw).trim();
-            // If it looks like HH:MM:SS or HH:MM, keep as is; else truncate
-            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(str)) {
-                return str.slice(0, 5);
-            }
-            return str.slice(0, 5) || '--:--';
+            return String(raw).trim();
         }
 
         // ================================================================
@@ -715,7 +714,6 @@
                 const cols = rows[i].map(c => String(c).trim());
                 if (cols.every(c => c === '')) continue;
 
-                // Raw timestamp — we'll format it later
                 const rawTime = (idxTime !== -1 && cols[idxTime]) ? cols[idxTime] : `Entry #${i}`;
                 const moistVal = (idxMoist !== -1) ? parseFloat(cols[idxMoist]) : 0;
                 const tempVal = (idxTemp !== -1) ? parseFloat(cols[idxTemp]) : 0;
@@ -727,7 +725,7 @@
 
                 records.push({
                     rawTimestamp: rawTime,
-                    timestamp: rawTime, // will be formatted on display
+                    timestamp: rawTime,
                     moisture: isNaN(moistVal) ? 0 : moistVal,
                     temp: isNaN(tempVal) ? 0 : tempVal,
                     ec: isNaN(ecVal) ? 0 : ecVal,
@@ -747,6 +745,7 @@
             const records = [];
             const now = new Date();
             for (let i = 15; i >= 0; i--) {
+                // Generate timstamps at 6-hour intervals or minute intervals for mock
                 const time = new Date(now.getTime() - i * 60000);
                 const timeStr = time.toISOString();
                 records.push({
@@ -764,37 +763,22 @@
             return records;
         }
 
-        // ================================================================
-        //  INIT CHARTS
-        // ================================================================
-        function initCharts() {
-            const ctxEnv = document.getElementById('envChart').getContext('2d');
-            envChart = new Chart(ctxEnv, {
+        // Common Chart Option Builder
+        function createLineChartConfig(label, color, bgColor) {
+            return {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Moisture (%)',
-                        borderColor: '#00e699',
-                        backgroundColor: 'rgba(0, 230, 153, 0.15)',
+                        label: label,
+                        borderColor: color,
+                        backgroundColor: bgColor,
                         data: [],
                         fill: true,
-                        tension: 0.4
-                    }, {
-                        label: 'Temp (°C)',
-                        borderColor: '#ffb703',
-                        backgroundColor: 'rgba(255, 183, 3, 0.15)',
-                        data: [],
-                        fill: true,
-                        tension: 0.4
-                    }, {
-                        label: 'EC (µS/cm)',
-                        borderColor: '#00bfff',
-                        backgroundColor: 'rgba(0, 191, 255, 0.15)',
-                        data: [],
-                        fill: false,
-                        yAxisID: 'y1',
-                        tension: 0.4
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
                     }]
                 },
                 options: {
@@ -804,24 +788,38 @@
                         legend: { labels: { color: '#8b9bb4', font: { family: 'Outfit' } } },
                         tooltip: {
                             callbacks: {
-                                title: (items) => {
-                                    const raw = items[0].label;
-                                    return `📅 ${formatTimestamp(raw)}`;
-                                }
+                                title: (items) => `Timestamp: ${items[0].label}`
                             }
                         }
                     },
                     scales: {
                         x: {
-                            ticks: { color: '#8b9bb4', maxTicksLimit: 12 },
+                            ticks: { color: '#8b9bb4', maxRotation: 45, autoSkip: true, maxTicksLimit: 12 },
                             grid: { color: 'rgba(255,255,255,0.05)' }
                         },
-                        y: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        y1: { position: 'right', ticks: { color: '#00bfff' }, grid: { drawOnChartArea: false } }
+                        y: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } }
                     }
                 }
-            });
+            };
+        }
 
+        // ================================================================
+        //  INIT CHARTS
+        // ================================================================
+        function initCharts() {
+            // Moisture Line Chart
+            const ctxMoisture = document.getElementById('moistureChart').getContext('2d');
+            moistureChart = new Chart(ctxMoisture, createLineChartConfig('Moisture (%)', '#00e699', 'rgba(0, 230, 153, 0.15)'));
+
+            // Temp Line Chart
+            const ctxTemp = document.getElementById('tempChart').getContext('2d');
+            tempChart = new Chart(ctxTemp, createLineChartConfig('Temp (°C)', '#ffb703', 'rgba(255, 183, 3, 0.15)'));
+
+            // EC Line Chart
+            const ctxEC = document.getElementById('ecChart').getContext('2d');
+            ecChart = new Chart(ctxEC, createLineChartConfig('EC (µS/cm)', '#00bfff', 'rgba(0, 191, 255, 0.15)'));
+
+            // NPK Bar Chart
             const ctxNPK = document.getElementById('npkChart').getContext('2d');
             npkChart = new Chart(ctxNPK, {
                 type: 'bar',
@@ -852,14 +850,12 @@
         }
 
         // ================================================================
-        //  UPDATE UI — with readable timestamps
+        //  UPDATE UI — with accurate x-axis timestamps matching data sheet
         // ================================================================
         function updateDashboard(records) {
             if (!records || records.length === 0) return;
 
             const latest = records[records.length - 1];
-
-            // Format the timestamp for display
             const displayTime = formatTimestamp(latest.rawTimestamp || latest.timestamp);
 
             document.getElementById('valMoisture').innerText = `${latest.moisture}%`;
@@ -874,18 +870,28 @@
             document.getElementById('valPH').innerText = latest.ph;
             document.getElementById('timePH').innerText = displayTime;
 
-            // Environment chart — use short labels for x‑axis
+            // Accurate timestamps for X Axis directly from the data sheet
             const labels = records.map(r => formatTimestampShort(r.rawTimestamp || r.timestamp));
-            envChart.data.labels = labels;
-            envChart.data.datasets[0].data = records.map(r => r.moisture);
-            envChart.data.datasets[1].data = records.map(r => r.temp);
-            envChart.data.datasets[2].data = records.map(r => r.ec);
-            envChart.update();
+
+            // Update Soil Moisture Chart
+            moistureChart.data.labels = labels;
+            moistureChart.data.datasets[0].data = records.map(r => r.moisture);
+            moistureChart.update();
+
+            // Update Temperature Chart
+            tempChart.data.labels = labels;
+            tempChart.data.datasets[0].data = records.map(r => r.temp);
+            tempChart.update();
+
+            // Update EC Chart
+            ecChart.data.labels = labels;
+            ecChart.data.datasets[0].data = records.map(r => r.ec);
+            ecChart.update();
 
             // NPK chart
             npkChart.data.datasets[0].data = [latest.nitrogen, latest.phosphorus, latest.potassium];
             npkChart.update();
-            document.getElementById('npkTimestamp').innerText = `📊 ${formatTimestamp(latest.rawTimestamp || latest.timestamp)}`;
+            document.getElementById('npkTimestamp').innerText = `At ${displayTime}`;
 
             // Table — show full readable timestamps
             const tableBody = document.getElementById('telemetryTableBody');
@@ -939,13 +945,13 @@
                 }
             } catch (err) {
                 console.error('XLSX fetch error:', err);
-                statusText.innerText = '⚠️ Sync failed – using demo data';
+                statusText.innerText = '⚠️ Sync failed. Falling back to demo mode.';
                 updateDashboard(generateMockData());
             }
         }
 
         // ================================================================
-        //  INTERVAL MANAGEMENT
+        //  INTERVAL MANAGEMENT (Default 6 Hours)
         // ================================================================
         function startSyncLoop() {
             if (syncTimer) clearInterval(syncTimer);
@@ -967,21 +973,14 @@
             const intervalSelect = document.getElementById('refreshInterval');
             const demoCheckbox = document.getElementById('demoModeCheckbox');
 
-            // Show the locked URL in the modal (read‑only)
             lockedUrlDisplay.value = csvUrl || '(no URL hardcoded — demo mode)';
-
-            // Set interval dropdown to match stored value
             intervalSelect.value = syncInterval;
 
-            // If no URL is hardcoded, enable demo mode by default
             if (!csvUrl) demoCheckbox.checked = true;
 
-            // Modal open/close
             configBtn.onclick = () => modal.classList.add('active');
             closeModalBtn.onclick = () => modal.classList.remove('active');
 
-            // Save: only interval + demo mode are user‑controllable.
-            // The URL is permanently locked via HARDCODED_XLSX_URL.
             saveConfigBtn.onclick = () => {
                 syncInterval = parseInt(intervalSelect.value, 10);
                 localStorage.setItem(STORAGE_KEY_INTERVAL, syncInterval);
@@ -989,14 +988,13 @@
                 startSyncLoop();
             };
 
-            // Click outside modal to close
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) modal.classList.remove('active');
             });
 
-            // Start the loop
             startSyncLoop();
         });
     </script>
 </body>
 </html>
+
