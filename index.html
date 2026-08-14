@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Soil Sensor Dashboard</title>
+
+    <!-- SheetJS: reads XLSX files in the browser -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- Chart.js: creates the graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f8;
+            color: #1f2937;
+        }
+
+        /* =========================
+           HEADER
+        ========================= */
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 35px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 34px;
+        }
+
+        header p {
+            margin: 10px 0 0;
+            opacity: 0.75;
+        }
+
+
+        /* =========================
+           STATUS
+        ========================= */
+
+        #status {
+            text-align: center;
+            padding: 18px;
+            color: #6b7280;
+        }
+
+
+        /* =========================
+           LATEST VALUES
+        ========================= */
+
+        .latest-container {
+            max-width: 1400px;
+            margin: auto;
+            padding: 0 30px 30px;
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(180px, 1fr));
+
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+
+            box-shadow:
+                0 3px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 25px;
+            font-weight: bold;
+        }
+
+
+        /* =========================
+           DASHBOARD
+        ========================= */
+
+        .dashboard {
+            max-width: 1400px;
+            margin: auto;
+
+            padding: 0 30px 40px;
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(420px, 1fr));
+
+            gap: 25px;
+        }
+
+        .chart-card {
+            background: white;
+
+            padding: 22px;
+
+            border-radius: 12px;
+
+            box-shadow:
+                0 3px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .chart-card h2 {
+            margin: 0 0 20px;
+            font-size: 19px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+
+        /* =========================
+           ERROR
+        ========================= */
+
+        #error {
+            display: none;
+
+            max-width: 900px;
+
+            margin: 20px auto;
+
+            padding: 20px;
+
+            background: #fee2e2;
+
+            color: #991b1b;
+
+            border-radius: 10px;
+        }
+
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media (max-width: 600px) {
+
+            header h1 {
+                font-size: 26px;
+            }
+
+            .dashboard {
+                grid-template-columns: 1fr;
+                padding: 0 15px 30px;
+            }
+
+            .latest-container {
+                padding: 0 15px 20px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =========================
+     HEADER
+========================= -->
+
+<header>
+
+    <h1>🌱 Soil Sensor Dashboard</h1>
+
+    <p>
+        Live soil and environmental measurements
+    </p>
+
+</header>
+
+
+<!-- =========================
+     STATUS
+========================= -->
+
+<div id="status">
+    Loading Google Sheet...
+</div>
+
+
+<!-- =========================
+     ERROR
+========================= -->
+
+<div id="error"></div>
+
+
+<!-- =========================
+     LATEST VALUES
+========================= -->
+
+<div
+    id="latestValues"
+    class="latest-container">
+</div>
+
+
+<!-- =========================
+     GRAPHS
+========================= -->
+
+<div
+    id="dashboard"
+    class="dashboard">
+</div>
+
+
+<script>
+
+
+// ============================================================
+// GOOGLE SHEET
+// ============================================================
+
+const GOOGLE_SHEET_URL =
+    "https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/export?format=xlsx&gid=2009997265";
+
+
+// ============================================================
+// CHART STORAGE
+// ============================================================
+
+const charts = {};
+
+
+// ============================================================
+// LOAD GOOGLE SHEET
+// ============================================================
+
+async function loadGoogleSheet() {
+
+    try {
+
+        showStatus("Downloading latest Google Sheet data...");
+
+        hideError();
+
+
+        // ----------------------------------------------------
+        // Download XLSX
+        // ----------------------------------------------------
+
+        const response =
+            await fetch(GOOGLE_SHEET_URL);
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                `Google Sheets returned HTTP ${response.status}`
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // Convert response into ArrayBuffer
+        //
+        // IMPORTANT:
+        // Do NOT use Buffer.from()
+        // because Buffer is Node.js-only.
+        // ----------------------------------------------------
+
+        const arrayBuffer =
+            await response.arrayBuffer();
+
+
+        // ----------------------------------------------------
+        // Read XLSX with SheetJS
+        // ----------------------------------------------------
+
+        const workbook =
+            XLSX.read(
+                arrayBuffer,
+                {
+                    type: "array"
+                }
+            );
+
+
+        console.log(
+            "Available sheets:",
+            workbook.SheetNames
+        );
+
+
+        // ----------------------------------------------------
+        // Get first sheet
+        // ----------------------------------------------------
+
+        const sheetName =
+            workbook.SheetNames[0];
+
+
+        const worksheet =
+            workbook.Sheets[sheetName];
+
+
+        if (!worksheet) {
+
+            throw new Error(
+                "Could not find a worksheet."
+            );
+
+        }
+
+
+        // ----------------------------------------------------
+        // Convert worksheet into JavaScript objects
+        // ----------------------------------------------------
+
+        const data =
+            XLSX.utils.sheet_to_json(
+                worksheet,
+                {
+                    defval: null
+                }
+            );
+
+
+        console.log(
+            "Raw data:",
+            data
+        );
+
+
+        // ----------------------------------------------------
+        // Check data
+        // ----------------------------------------------------
+
+        if (!data.length) {
+
+            throw new Error(
+                "The Google Sheet contains no data."
+            );
+
+        }
+
+
+        console.log(
+            "Columns:",
+            Object.keys(data[0])
+        );
+
+
+        // ----------------------------------------------------
+        // Display dashboard
+        // ----------------------------------------------------
+
+        createLatestValues(data);
+
+        createGraphs(data);
+
+
+        showStatus(
+            `Loaded ${data.length} measurements • Last updated ${new Date().toLocaleTimeString()}`
+        );
+
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "ERROR:",
+            error
+        );
+
+
+        showError(
+            "Could not load Google Sheet: " +
+            error.message
+        );
+
+
+        showStatus(
+            "Failed to load data."
+        );
+
+    }
+
+}
+
+
+// ============================================================
+// FIND TIME COLUMN
+// ============================================================
+
+function findTimeColumn(data) {
+
+    const columns =
+        Object.keys(data[0]);
+
+
+    // Look for exact "Time"
+
+    if (columns.includes("Time")) {
+
+        return "Time";
+
+    }
+
+
+    // Look for a column containing "time"
+
+    const timeColumn =
+        columns.find(
+            column =>
+                column
+                    .toLowerCase()
+                    .includes("time")
+        );
+
+
+    return timeColumn || columns[0];
+
+}
+
+
+// ============================================================
+// CHECK IF VALUE IS NUMERIC
+// ============================================================
+
+function isNumeric(value) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
+        return false;
+
+    }
+
+
+    const number =
+        Number(value);
+
+
+    return Number.isFinite(number);
+
+}
+
+
+// ============================================================
+// FIND NUMERIC COLUMNS
+// ============================================================
+
+function findNumericColumns(data) {
+
+    const columns =
+        Object.keys(data[0]);
+
+
+    const timeColumn =
+        findTimeColumn(data);
+
+
+    return columns.filter(
+        column => {
+
+            // Don't graph Time
+            if (column === timeColumn) {
+
+                return false;
+
+            }
+
+
+            // Look through the data
+
+            const values =
+                data
+                    .map(row => row[column])
+                    .filter(
+                        value =>
+                            value !== null &&
+                            value !== undefined &&
+                            value !== ""
+                    );
+
+
+            if (!values.length) {
+
+                return false;
+
+            }
+
+
+            // Column is numeric if
+            // most values are numbers
+
+            const numericCount =
+                values.filter(
+                    isNumeric
+                ).length;
+
+
+            return (
+                numericCount /
+                values.length
+            ) >= 0.5;
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// GET UNIT FROM COLUMN NAME
+// ============================================================
+
+function getUnit(columnName) {
+
+    // Extract anything inside parentheses
+
+    const match =
+        columnName.match(
+            /\(([^)]+)\)/
+        );
+
+
+    if (match) {
+
+        return match[1];
+
+    }
+
+
+    return "";
+
+}
+
+
+// ============================================================
+// GET CLEAN LABEL
+// ============================================================
+
+function getLabel(columnName) {
+
+    // Remove unit from label
+
+    return columnName
+        .replace(
+            /\s*\([^)]*\)/g,
+            ""
+        )
+        .trim();
+
+}
+
+
+// ============================================================
+// CREATE LATEST VALUE CARDS
+// ============================================================
+
+function createLatestValues(data) {
+
+    const container =
+        document.getElementById(
+            "latestValues"
+        );
+
+
+    const latest =
+        data[data.length - 1];
+
+
+    const timeColumn =
+        findTimeColumn(data);
+
+
+    const numericColumns =
+        findNumericColumns(data);
+
+
+    let html = "";
+
+
+    // ----------------------------------------------------
+    // Time
+    // ----------------------------------------------------
+
+    html += `
+
+        <div class="stat-card">
+
+            <div class="stat-label">
+                Latest Reading
+            </div>
+
+            <div class="stat-value">
+                ${
+                    latest[timeColumn] ??
+                    "N/A"
+                }
+            </div>
+
+        </div>
+
+    `;
+
+
+    // ----------------------------------------------------
+    // Each measurement
+    // ----------------------------------------------------
+
+    numericColumns.forEach(
+        column => {
+
+            const value =
+                latest[column];
+
+
+            const unit =
+                getUnit(column);
+
+
+            html += `
+
+                <div class="stat-card">
+
+                    <div class="stat-label">
+                        ${getLabel(column)}
+                    </div>
+
+                    <div class="stat-value">
+
+                        ${
+                            value ??
+                            "N/A"
+                        }
+
+                        ${
+                            unit
+                                ? " " + unit
+                                : ""
+                        }
+
+                    </div>
+
+                </div>
+
+            `;
+
+        }
+    );
+
+
+    container.innerHTML =
+        html;
+
+}
+
+
+// ============================================================
+// CREATE ALL GRAPHS
+// ============================================================
+
+function createGraphs(data) {
+
+    const dashboard =
+        document.getElementById(
+            "dashboard"
+        );
+
+
+    // Clear old graph containers
+
+    dashboard.innerHTML = "";
+
+
+    const timeColumn =
+        findTimeColumn(data);
+
+
+    const numericColumns =
+        findNumericColumns(data);
+
+
+    console.log(
+        "Numeric columns:",
+        numericColumns
+    );
+
+
+    // ----------------------------------------------------
+    // Create graph for every numeric column
+    // ----------------------------------------------------
+
+    numericColumns.forEach(
+        (column, index) => {
+
+            const chartID =
+                `chart_${index}`;
+
+
+            const label =
+                getLabel(column);
+
+
+            const unit =
+                getUnit(column);
+
+
+            // Create card
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+
+            card.className =
+                "chart-card";
+
+
+            card.innerHTML = `
+
+                <h2>
+                    ${getIcon(column)}
+                    ${label}
+                </h2>
+
+                <div class="chart-container">
+
+                    <canvas
+                        id="${chartID}">
+                    </canvas>
+
+                </div>
+
+            `;
+
+
+            dashboard.appendChild(
+                card
+            );
+
+
+            // ------------------------------------------------
+            // X axis
+            // ------------------------------------------------
+
+            const labels =
+                data.map(
+                    row =>
+                        row[timeColumn]
+                );
+
+
+            // ------------------------------------------------
+            // Y axis
+            // ------------------------------------------------
+
+            const values =
+                data.map(
+                    row => {
+
+                        const value =
+                            Number(
+                                row[column]
+                            );
+
+
+                        if (
+                            Number.isFinite(
+                                value
+                            )
+                        ) {
+
+                            return value;
+
+                        }
+
+
+                        return null;
+
+                    }
+                );
+
+
+            // ------------------------------------------------
+            // Create chart
+            // ------------------------------------------------
+
+            createChart(
+
+                chartID,
+
+                labels,
+
+                values,
+
+                label,
+
+                unit
+
+            );
+
+        }
+    );
+
+
+    if (!numericColumns.length) {
+
+        dashboard.innerHTML = `
+
+            <div class="chart-card">
+
+                <h2>
+                    No numeric data found
+                </h2>
+
+                <p>
+                    Check the columns in your
+                    Google Sheet.
+                </p>
+
+            </div>
+
+        `;
+
+    }
+
+}
+
+
+// ============================================================
+// CREATE INDIVIDUAL CHART
+// ============================================================
+
+function createChart(
+
+    chartID,
+
+    labels,
+
+    values,
+
+    label,
+
+    unit
+
+) {
+
+
+    const canvas =
+        document.getElementById(
+            chartID
+        );
+
+
+    // Destroy old chart
+
+    if (charts[chartID]) {
+
+        charts[chartID].destroy();
+
+    }
+
+
+    charts[chartID] =
+        new Chart(
+
+            canvas,
+
+            {
+
+                type: "line",
+
+
+                data: {
+
+                    labels: labels,
+
+
+                    datasets: [
+
+                        {
+
+                            label:
+                                unit
+                                    ? `${label} (${unit})`
+                                    : label,
+
+
+                            data: values,
+
+
+                            borderWidth: 2,
+
+
+                            tension: 0.25,
+
+
+                            fill: true,
+
+
+                            pointRadius: 2,
+
+
+                            pointHoverRadius: 6
+
+                        }
+
+                    ]
+
+                },
+
+
+                options: {
+
+                    responsive: true,
+
+
+                    maintainAspectRatio: false,
+
+
+                    interaction: {
+
+                        mode: "index",
+
+                        intersect: false
+
+                    },
+
+
+                    plugins: {
+
+                        legend: {
+
+                            display: true
+
+                        },
+
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label:
+                                    function(context) {
+
+                                        const value =
+                                            context.parsed.y;
+
+
+                                        if (
+                                            value === null
+                                        ) {
+
+                                            return `${label}: No data`;
+
+                                        }
+
+
+                                        return unit
+
+                                            ? `${label}: ${value} ${unit}`
+
+                                            : `${label}: ${value}`;
+
+                                    }
+
+                            }
+
+                        }
+
+                    },
+
+
+                    scales: {
+
+                        x: {
+
+                            title: {
+
+                                display: true,
+
+                                text: "Time"
+
+                            },
+
+
+                            ticks: {
+
+                                autoSkip: true,
+
+                                maxTicksLimit: 12,
+
+                                maxRotation: 45,
+
+                                minRotation: 45
+
+                            }
+
+                        },
+
+
+                        y: {
+
+                            beginAtZero: false,
+
+
+                            title: {
+
+                                display: true,
+
+                                text:
+                                    unit
+                                        ? `${label} (${unit})`
+                                        : label
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        );
+
+}
+
+
+// ============================================================
+// GET ICON
+// ============================================================
+
+function getIcon(column) {
+
+    const name =
+        column.toLowerCase();
+
+
+    if (
+        name.includes("moisture")
+    ) {
+
+        return "💧";
+
+    }
+
+
+    if (
+        name.includes("temperature")
+    ) {
+
+        return "🌡️";
+
+    }
+
+
+    if (
+        name.includes("ec") ||
+        name.includes("conductivity")
+    ) {
+
+        return "⚡";
+
+    }
+
+
+    if (
+        name === "ph" ||
+        name.includes("pH")
+    ) {
+
+        return "⚗️";
+
+    }
+
+
+    if (
+        name.includes("nitrogen")
+    ) {
+
+        return "🧪";
+
+    }
+
+
+    if (
+        name.includes("phosphorus")
+    ) {
+
+        return "🧬";
+
+    }
+
+
+    if (
+        name.includes("potassium")
+    ) {
+
+        return "🍃";
+
+    }
+
+
+    return "📊";
+
+}
+
+
+// ============================================================
+// STATUS
+// ============================================================
+
+function showStatus(message) {
+
+    document.getElementById(
+        "status"
+    ).textContent =
+        message;
+
+}
+
+
+// ============================================================
+// ERROR
+// ============================================================
+
+function showError(message) {
+
+    const error =
+        document.getElementById(
+            "error"
+        );
+
+
+    error.textContent =
+        message;
+
+
+    error.style.display =
+        "block";
+
+}
+
+
+function hideError() {
+
+    const error =
+        document.getElementById(
+            "error"
+        );
+
+
+    error.style.display =
+        "none";
+
+}
+
+
+// ============================================================
+// INITIAL LOAD
+// ============================================================
+
+loadGoogleSheet();
+
+
+// ============================================================
+// REFRESH EVERY 30 SECONDS
+// ============================================================
+
+setInterval(
+
+    loadGoogleSheet,
+
+    30000
+
+);
+
+
+</script>
+
+
+</body>
+
+</html>
