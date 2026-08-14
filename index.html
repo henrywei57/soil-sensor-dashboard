@@ -314,6 +314,11 @@
             border-color: var(--accent-green);
         }
 
+        .form-group input:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .help-box {
             background: rgba(0, 191, 255, 0.08);
             border: 1px solid rgba(0, 191, 255, 0.3);
@@ -323,6 +328,19 @@
             color: #a8e3ff;
             margin-bottom: 1.5rem;
             line-height: 1.4;
+        }
+
+        .lock-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 183, 3, 0.12);
+            border: 1px solid var(--accent-amber);
+            border-radius: 20px;
+            padding: 2px 12px;
+            font-size: 0.7rem;
+            color: var(--accent-amber);
+            font-weight: 500;
         }
 
         /* Table Styling */
@@ -514,7 +532,7 @@
         </div>
     </div>
 
-    <!-- Spreadsheet Configuration Modal -->
+    <!-- Spreadsheet Configuration Modal (locked URL) -->
     <div class="modal-overlay" id="configModal">
         <div class="modal">
             <div class="modal-header">
@@ -523,18 +541,20 @@
             </div>
 
             <div class="help-box">
-                💡 <strong>How to publish your Google Sheet:</strong><br />
-                1. Open your Google Sheet → Go to <em>File</em> → <em>Share</em> → <em>Publish to web</em>.<br />
-                2. Select <strong>Entire Document</strong> (or your sheet tab) and change output format to
-                <strong>Microsoft Excel (.xlsx)</strong>.<br />
-                3. Copy and paste the link below!<br />
-                <span style="color:var(--accent-green);font-size:0.75rem;">🔒 URL is hardcoded in the script – changes here are ignored.</span>
+                💡 <strong>Spreadsheet is locked</strong> — the URL is hardcoded in the dashboard script.<br />
+                <span style="display:inline-block;margin-top:4px;font-size:0.75rem;color:var(--accent-amber);">
+                    🔒 The sheet link cannot be changed from this panel.
+                </span>
             </div>
 
+            <!-- Locked URL display (read-only, non-editable) -->
             <div class="form-group">
-                <label for="csvUrlInput">Google Sheet Published XLSX URL:</label>
-                <input type="text" id="csvUrlInput" readonly
-                placeholder="Hardcoded URL from script" />
+                <label style="display:flex;align-items:center;gap:8px;">
+                    <span>📎 Active Spreadsheet URL</span>
+                    <span class="lock-badge">🔒 locked</span>
+                </label>
+                <input type="text" id="lockedUrlDisplay" readonly disabled
+                style="background:rgba(255,255,255,0.03);color:var(--text-muted);font-size:0.8rem;cursor:default;" />
             </div>
 
             <div class="form-group">
@@ -550,7 +570,7 @@
             <div class="form-group">
                 <label>
                     <input type="checkbox" id="demoModeCheckbox" style="width: auto; margin-right: 8px;" />
-                    Use Simulated Demo Live Data (If Sheet URL empty)
+                    Use Simulated Demo Live Data (overrides sheet)
                 </label>
             </div>
 
@@ -560,29 +580,22 @@
 
     <!-- Dashboard Script Engine -->
     <script>
-        // ============================================================
+        // ================================================================
         //  🔽  HARDCODE YOUR GOOGLE SHEET XLSX URL BELOW  🔽
-        // ============================================================
-        //  Example:
-        //  const HARDCODED_XLSX_URL =
-        //    'https://docs.google.com/spreadsheets/d/1ABC123/export?format=xlsx&gid=0';
-        //
-        //  Or use the "Publish to web" XLSX URL:
-        //  const HARDCODED_XLSX_URL =
-        //    'https://docs.google.com/spreadsheets/d/1ABC123/pub?output=xlsx';
-        // ============================================================
+        //  This URL is permanently locked — the user cannot change it.
+        // ================================================================
         const HARDCODED_XLSX_URL =
             'https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/export?format=xlsx&gid=2009997265';
 
-        // If you want to use the "Publish to web" style instead, uncomment:
+        // Alternative "Publish to web" style (uncomment if needed):
         // const HARDCODED_XLSX_URL =
         //   'https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/pub?output=xlsx';
-        // ============================================================
+        // ================================================================
 
         // Configuration & State Management
         const STORAGE_KEY_INTERVAL = 'aiot_refresh_interval';
 
-        // Always use the hardcoded URL – ignore any localStorage value.
+        // Always use the hardcoded URL – completely locked.
         const csvUrl = HARDCODED_XLSX_URL;
         let syncInterval = parseInt(localStorage.getItem(STORAGE_KEY_INTERVAL) || '10000', 10);
         let syncTimer = null;
@@ -591,18 +604,99 @@
         let envChart = null;
         let npkChart = null;
 
-        // ============================================================
-        //  XLSX PARSER  (using SheetJS)
-        // ============================================================
+        // ================================================================
+        //  TIMESTAMP FORMATTER — makes any timestamp human‑readable
+        // ================================================================
+        function formatTimestamp(raw) {
+            if (!raw) return '--:--:--';
+
+            // If it's already a number (Excel serial or Unix ms), try to parse it.
+            let d = null;
+
+            // Try as number (Excel serial or Unix timestamp)
+            if (typeof raw === 'number' || /^\d+$/.test(raw)) {
+                const num = Number(raw);
+                // Excel serial: days since 1899-12-30, roughly 25569 days offset
+                if (num > 30000 && num < 60000) {
+                    // Excel date serial
+                    const excelEpoch = new Date(1899, 11, 30);
+                    d = new Date(excelEpoch.getTime() + num * 86400000);
+                } else if (num > 1e12) {
+                    // Milliseconds since Unix epoch
+                    d = new Date(num);
+                } else if (num > 1e9 && num < 1e10) {
+                    // Seconds since Unix epoch
+                    d = new Date(num * 1000);
+                }
+            }
+
+            // Try parsing as string
+            if (!d || isNaN(d.getTime())) {
+                const parsed = new Date(raw);
+                if (!isNaN(parsed.getTime())) {
+                    d = parsed;
+                }
+            }
+
+            // If we have a valid date, format it nicely
+            if (d && !isNaN(d.getTime())) {
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                ];
+                const mon = months[d.getMonth()];
+                const day = String(d.getDate()).padStart(2, '0');
+                const year = d.getFullYear();
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                const ss = String(d.getSeconds()).padStart(2, '0');
+                return `${mon} ${day}, ${year} · ${hh}:${mm}:${ss}`;
+            }
+
+            // Fallback: return the original string trimmed
+            return String(raw).trim() || '--:--:--';
+        }
+
+        // Short version for chart labels (time only, to keep x‑axis clean)
+        function formatTimestampShort(raw) {
+            if (!raw) return '--:--';
+            let d = null;
+            if (typeof raw === 'number' || /^\d+$/.test(raw)) {
+                const num = Number(raw);
+                if (num > 30000 && num < 60000) {
+                    const excelEpoch = new Date(1899, 11, 30);
+                    d = new Date(excelEpoch.getTime() + num * 86400000);
+                } else if (num > 1e12) {
+                    d = new Date(num);
+                } else if (num > 1e9 && num < 1e10) {
+                    d = new Date(num * 1000);
+                }
+            }
+            if (!d || isNaN(d.getTime())) {
+                const parsed = new Date(raw);
+                if (!isNaN(parsed.getTime())) d = parsed;
+            }
+            if (d && !isNaN(d.getTime())) {
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                return `${hh}:${mm}`;
+            }
+            const str = String(raw).trim();
+            // If it looks like HH:MM:SS or HH:MM, keep as is; else truncate
+            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(str)) {
+                return str.slice(0, 5);
+            }
+            return str.slice(0, 5) || '--:--';
+        }
+
+        // ================================================================
+        //  XLSX PARSER (SheetJS)
+        // ================================================================
         function parseXLSX(workbook) {
-            // Get first sheet
             const firstSheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[firstSheetName];
-            // Convert sheet to array of arrays
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
             if (rows.length < 2) return [];
 
-            // --- Detect headers ---
             const headerRow = rows[0].map(cell => String(cell).trim().toLowerCase());
             const findIdx = (keywords) =>
                 headerRow.findIndex(h => keywords.some(k => h.includes(k)));
@@ -619,10 +713,10 @@
             const records = [];
             for (let i = 1; i < rows.length; i++) {
                 const cols = rows[i].map(c => String(c).trim());
-                // skip completely empty rows
                 if (cols.every(c => c === '')) continue;
 
-                const timeVal = (idxTime !== -1 && cols[idxTime]) ? cols[idxTime] : `Entry #${i}`;
+                // Raw timestamp — we'll format it later
+                const rawTime = (idxTime !== -1 && cols[idxTime]) ? cols[idxTime] : `Entry #${i}`;
                 const moistVal = (idxMoist !== -1) ? parseFloat(cols[idxMoist]) : 0;
                 const tempVal = (idxTemp !== -1) ? parseFloat(cols[idxTemp]) : 0;
                 const ecVal = (idxEC !== -1) ? parseFloat(cols[idxEC]) : 0;
@@ -632,7 +726,8 @@
                 const kVal = (idxK !== -1) ? parseFloat(cols[idxK]) : 0;
 
                 records.push({
-                    timestamp: timeVal,
+                    rawTimestamp: rawTime,
+                    timestamp: rawTime, // will be formatted on display
                     moisture: isNaN(moistVal) ? 0 : moistVal,
                     temp: isNaN(tempVal) ? 0 : tempVal,
                     ec: isNaN(ecVal) ? 0 : ecVal,
@@ -645,16 +740,17 @@
             return records;
         }
 
-        // ============================================================
+        // ================================================================
         //  MOCK DATA (fallback)
-        // ============================================================
+        // ================================================================
         function generateMockData() {
             const records = [];
             const now = new Date();
             for (let i = 15; i >= 0; i--) {
                 const time = new Date(now.getTime() - i * 60000);
-                const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const timeStr = time.toISOString();
                 records.push({
+                    rawTimestamp: timeStr,
                     timestamp: timeStr,
                     moisture: (45 + Math.sin(i * 0.5) * 5 + Math.random() * 2).toFixed(1),
                     temp: (24.2 + Math.cos(i * 0.3) * 1.5 + Math.random() * 0.5).toFixed(1),
@@ -668,9 +764,9 @@
             return records;
         }
 
-        // ============================================================
+        // ================================================================
         //  INIT CHARTS
-        // ============================================================
+        // ================================================================
         function initCharts() {
             const ctxEnv = document.getElementById('envChart').getContext('2d');
             envChart = new Chart(ctxEnv, {
@@ -708,12 +804,18 @@
                         legend: { labels: { color: '#8b9bb4', font: { family: 'Outfit' } } },
                         tooltip: {
                             callbacks: {
-                                title: (items) => `Timestamp: ${items[0].label}`
+                                title: (items) => {
+                                    const raw = items[0].label;
+                                    return `📅 ${formatTimestamp(raw)}`;
+                                }
                             }
                         }
                     },
                     scales: {
-                        x: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: {
+                            ticks: { color: '#8b9bb4', maxTicksLimit: 12 },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
                         y: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } },
                         y1: { position: 'right', ticks: { color: '#00bfff' }, grid: { drawOnChartArea: false } }
                     }
@@ -749,29 +851,32 @@
             });
         }
 
-        // ============================================================
-        //  UPDATE UI
-        // ============================================================
+        // ================================================================
+        //  UPDATE UI — with readable timestamps
+        // ================================================================
         function updateDashboard(records) {
             if (!records || records.length === 0) return;
 
             const latest = records[records.length - 1];
 
+            // Format the timestamp for display
+            const displayTime = formatTimestamp(latest.rawTimestamp || latest.timestamp);
+
             document.getElementById('valMoisture').innerText = `${latest.moisture}%`;
-            document.getElementById('timeMoisture').innerText = latest.timestamp;
+            document.getElementById('timeMoisture').innerText = displayTime;
 
             document.getElementById('valTemp').innerText = `${latest.temp}°C`;
-            document.getElementById('timeTemp').innerText = latest.timestamp;
+            document.getElementById('timeTemp').innerText = displayTime;
 
             document.getElementById('valEC').innerText = `${latest.ec} µS/cm`;
-            document.getElementById('timeEC').innerText = latest.timestamp;
+            document.getElementById('timeEC').innerText = displayTime;
 
             document.getElementById('valPH').innerText = latest.ph;
-            document.getElementById('timePH').innerText = latest.timestamp;
+            document.getElementById('timePH').innerText = displayTime;
 
-            // Environment chart
-            const timestamps = records.map(r => r.timestamp);
-            envChart.data.labels = timestamps;
+            // Environment chart — use short labels for x‑axis
+            const labels = records.map(r => formatTimestampShort(r.rawTimestamp || r.timestamp));
+            envChart.data.labels = labels;
             envChart.data.datasets[0].data = records.map(r => r.moisture);
             envChart.data.datasets[1].data = records.map(r => r.temp);
             envChart.data.datasets[2].data = records.map(r => r.ec);
@@ -780,76 +885,77 @@
             // NPK chart
             npkChart.data.datasets[0].data = [latest.nitrogen, latest.phosphorus, latest.potassium];
             npkChart.update();
-            document.getElementById('npkTimestamp').innerText = `At ${latest.timestamp}`;
+            document.getElementById('npkTimestamp').innerText = `📊 ${formatTimestamp(latest.rawTimestamp || latest.timestamp)}`;
 
-            // Table
+            // Table — show full readable timestamps
             const tableBody = document.getElementById('telemetryTableBody');
             document.getElementById('logCountBadge').innerText = `${records.length} Records`;
 
-            tableBody.innerHTML = records.slice().reverse().map(r => `
-                <tr>
-                    <td><span class="timestamp-badge">${r.timestamp}</span></td>
-                    <td style="color: var(--accent-green); font-weight:600;">${r.moisture}%</td>
-                    <td>${r.temp}°C</td>
-                    <td style="color: var(--accent-blue);">${r.ec} µS/cm</td>
-                    <td>${r.ph}</td>
-                    <td>${r.nitrogen} mg/kg</td>
-                    <td>${r.phosphorus} mg/kg</td>
-                    <td>${r.potassium} mg/kg</td>
-                </tr>
-            `).join('');
+            tableBody.innerHTML = records.slice().reverse().map(r => {
+                const t = formatTimestamp(r.rawTimestamp || r.timestamp);
+                return `
+                    <tr>
+                        <td><span class="timestamp-badge">${t}</span></td>
+                        <td style="color: var(--accent-green); font-weight:600;">${r.moisture}%</td>
+                        <td>${r.temp}°C</td>
+                        <td style="color: var(--accent-blue);">${r.ec} µS/cm</td>
+                        <td>${r.ph}</td>
+                        <td>${r.nitrogen} mg/kg</td>
+                        <td>${r.phosphorus} mg/kg</td>
+                        <td>${r.potassium} mg/kg</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
-        // ============================================================
-        //  FETCH XLSX FROM GOOGLE SHEETS (using SheetJS)
-        // ============================================================
+        // ================================================================
+        //  FETCH XLSX (locked URL)
+        // ================================================================
         async function fetchData() {
             const statusText = document.getElementById('statusText');
             const isDemo = document.getElementById('demoModeCheckbox').checked;
 
-            // If URL is empty or demo mode is forced, use mock data
             if (!csvUrl || isDemo) {
-                statusText.innerText = 'Using Simulated Live Telemetry';
+                statusText.innerText = '📊 Using Simulated Live Telemetry';
                 updateDashboard(generateMockData());
                 return;
             }
 
             try {
-                statusText.innerText = 'Fetching XLSX from Google Sheet…';
+                statusText.innerText = '📡 Fetching XLSX from Google Sheet…';
                 const response = await fetch(csvUrl);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                // Read as ArrayBuffer for XLSX parsing
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
                 const records = parseXLSX(workbook);
                 if (records.length > 0) {
                     updateDashboard(records);
-                    statusText.innerText = `Synced Live (${new Date().toLocaleTimeString()})`;
+                    statusText.innerText = `✅ Synced Live (${new Date().toLocaleTimeString()})`;
                 } else {
-                    statusText.innerText = 'Sheet empty or invalid format – using demo';
+                    statusText.innerText = '⚠️ Sheet empty – using demo data';
                     updateDashboard(generateMockData());
                 }
             } catch (err) {
                 console.error('XLSX fetch error:', err);
-                statusText.innerText = 'Sync failed. Falling back to demo mode.';
+                statusText.innerText = '⚠️ Sync failed – using demo data';
                 updateDashboard(generateMockData());
             }
         }
 
-        // ============================================================
+        // ================================================================
         //  INTERVAL MANAGEMENT
-        // ============================================================
+        // ================================================================
         function startSyncLoop() {
             if (syncTimer) clearInterval(syncTimer);
             fetchData();
             syncTimer = setInterval(fetchData, syncInterval);
         }
 
-        // ============================================================
+        // ================================================================
         //  DOM READY & MODAL LOGIC
-        // ============================================================
+        // ================================================================
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
 
@@ -857,12 +963,12 @@
             const configBtn = document.getElementById('configBtn');
             const closeModalBtn = document.getElementById('closeModalBtn');
             const saveConfigBtn = document.getElementById('saveConfigBtn');
-            const csvInput = document.getElementById('csvUrlInput');
+            const lockedUrlDisplay = document.getElementById('lockedUrlDisplay');
             const intervalSelect = document.getElementById('refreshInterval');
             const demoCheckbox = document.getElementById('demoModeCheckbox');
 
-            // Pre-fill the URL input with the hardcoded URL (read-only)
-            csvInput.value = csvUrl || '(no URL hardcoded – demo mode)';
+            // Show the locked URL in the modal (read‑only)
+            lockedUrlDisplay.value = csvUrl || '(no URL hardcoded — demo mode)';
 
             // Set interval dropdown to match stored value
             intervalSelect.value = syncInterval;
@@ -874,8 +980,8 @@
             configBtn.onclick = () => modal.classList.add('active');
             closeModalBtn.onclick = () => modal.classList.remove('active');
 
-            // Save: only interval + demo mode are user-controllable.
-            // The URL is always the hardcoded one.
+            // Save: only interval + demo mode are user‑controllable.
+            // The URL is permanently locked via HARDCODED_XLSX_URL.
             saveConfigBtn.onclick = () => {
                 syncInterval = parseInt(intervalSelect.value, 10);
                 localStorage.setItem(STORAGE_KEY_INTERVAL, syncInterval);
