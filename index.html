@@ -1,1557 +1,801 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Soil Sensor Dashboard</title>
-
-    <!-- SheetJS: reads XLSX files in the browser -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-    <!-- Chart.js: creates the graphs -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-
-    <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-
-        body {
-
-            margin: 0;
-
-            font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-
-            background: #f4f6f8;
-
-            color: #1f2937;
-
-        }
-
-
-        /* =========================
-           HEADER
-        ========================= */
-
-        header {
-
-            background: #1f2937;
-
-            color: white;
-
-            padding: 35px 20px;
-
-            text-align: center;
-
-        }
-
-
-        header h1 {
-
-            margin: 0;
-
-            font-size: 34px;
-
-        }
-
-
-        header p {
-
-            margin: 10px 0 0;
-
-            opacity: 0.75;
-
-        }
-
-
-        /* =========================
-           STATUS
-        ========================= */
-
-        #status {
-
-            text-align: center;
-
-            padding: 18px;
-
-            color: #6b7280;
-
-        }
-
-
-        /* =========================
-           LATEST VALUES
-        ========================= */
-
-        .latest-container {
-
-            max-width: 1400px;
-
-            margin: auto;
-
-            padding: 0 30px 30px;
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(auto-fit, minmax(180px, 1fr));
-
-            gap: 15px;
-
-        }
-
-
-        .stat-card {
-
-            background: white;
-
-            border-radius: 12px;
-
-            padding: 20px;
-
-            box-shadow:
-                0 3px 12px
-                rgba(0, 0, 0, 0.08);
-
-        }
-
-
-        .stat-label {
-
-            font-size: 13px;
-
-            color: #6b7280;
-
-            margin-bottom: 8px;
-
-        }
-
-
-        .stat-value {
-
-            font-size: 25px;
-
-            font-weight: bold;
-
-        }
-
-
-        /* =========================
-           DASHBOARD
-        ========================= */
-
-        .dashboard {
-
-            max-width: 1400px;
-
-            margin: auto;
-
-            padding: 0 30px 40px;
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(auto-fit, minmax(420px, 1fr));
-
-            gap: 25px;
-
-        }
-
-
-        .chart-card {
-
-            background: white;
-
-            padding: 22px;
-
-            border-radius: 12px;
-
-            box-shadow:
-                0 3px 12px
-                rgba(0, 0, 0, 0.08);
-
-        }
-
-
-        .chart-card h2 {
-
-            margin: 0 0 20px;
-
-            font-size: 19px;
-
-        }
-
-
-        .chart-container {
-
-            position: relative;
-
-            height: 300px;
-
-        }
-
-
-        /* =========================
-           ERROR
-        ========================= */
-
-        #error {
-
-            display: none;
-
-            max-width: 900px;
-
-            margin: 20px auto;
-
-            padding: 20px;
-
-            background: #fee2e2;
-
-            color: #991b1b;
-
-            border-radius: 10px;
-
-        }
-
-
-        /* =========================
-           MOBILE
-        ========================= */
-
-        @media (max-width: 600px) {
-
-            header h1 {
-
-                font-size: 26px;
-
-            }
-
-
-            .dashboard {
-
-                grid-template-columns: 1fr;
-
-                padding: 0 15px 30px;
-
-            }
-
-
-            .latest-container {
-
-                padding: 0 15px 20px;
-
-            }
-
-        }
-
-    </style>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plant AIoT Live Sensor Dashboard</title>
+  
+  <!-- Google Fonts & Chart.js -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 10% 20%, #0d131a 0%, #070a0e 90%);
+      --card-bg: rgba(18, 26, 36, 0.7);
+      --card-border: rgba(45, 62, 80, 0.5);
+      --card-hover-border: rgba(0, 230, 153, 0.4);
+      --accent-green: #00e699;
+      --accent-green-glow: rgba(0, 230, 153, 0.25);
+      --accent-blue: #00bfff;
+      --accent-amber: #ffb703;
+      --accent-red: #ff4d4d;
+      --accent-purple: #9d4edd;
+      --text-main: #f0f4f8;
+      --text-muted: #8b9bb4;
+      --glass-blur: blur(12px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 1.5rem;
+      overflow-x: hidden;
+    }
+
+    /* Header Styling */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: var(--card-bg);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--card-border);
+      padding: 1.25rem 2rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      font-size: 2rem;
+      filter: drop-shadow(0 0 10px var(--accent-green));
+    }
+
+    .brand-title h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #00e699 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-title p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(0, 230, 153, 0.1);
+      border: 1px solid var(--accent-green);
+      border-radius: 30px;
+      font-size: 0.85rem;
+      color: var(--accent-green);
+      font-weight: 500;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-green);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 230, 153, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 230, 153, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 230, 153, 0); }
+    }
+
+    button.btn {
+      background: linear-gradient(135deg, rgba(0, 230, 153, 0.2), rgba(0, 191, 255, 0.2));
+      border: 1px solid var(--accent-green);
+      color: #fff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button.btn:hover {
+      background: var(--accent-green);
+      color: #0d131a;
+      box-shadow: 0 0 15px var(--accent-green-glow);
+      transform: translateY(-2px);
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      border-color: var(--card-hover-border);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .card-title {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-icon {
+      font-size: 1.4rem;
+    }
+
+    .card-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-main);
+      margin-bottom: 0.4rem;
+    }
+
+    .card-subtext {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .timestamp-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent-blue);
+    }
+
+    /* Span 2 Columns for Charts */
+    .col-span-2 { grid-column: span 2; }
+    .col-span-4 { grid-column: span 4; }
+
+    .chart-card {
+      min-height: 340px;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 260px;
+      width: 100%;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: #121a24;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 580px;
+      padding: 2rem;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .form-group {
+      margin-bottom: 1.2rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent-green);
+    }
+
+    .help-box {
+      background: rgba(0, 191, 255, 0.08);
+      border: 1px solid rgba(0, 191, 255, 0.3);
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      font-size: 0.8rem;
+      color: #a8e3ff;
+      margin-bottom: 1.5rem;
+      line-height: 1.4;
+    }
+
+    /* Table Styling */
+    .table-responsive {
+      overflow-x: auto;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(8px);
+    }
+
+    tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Responsiveness */
+    @media (max-width: 1024px) {
+      .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+      .col-span-2 { grid-column: span 2; }
+      .col-span-4 { grid-column: span 2; }
+    }
+    @media (max-width: 640px) {
+      body { padding: 0.75rem; }
+      header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .col-span-2, .col-span-4 { grid-column: span 1; }
+    }
+  </style>
 </head>
-
-
 <body>
 
+  <!-- Header Section -->
+  <header>
+    <div class="brand-title">
+      <span class="brand-icon">🌱</span>
+      <div>
+        <h1>Plant AIoT Live Monitoring</h1>
+        <p>Real-time Google Sheet Sync & Telemetry Analytics</p>
+      </div>
+    </div>
+    
+    <div class="header-controls">
+      <div class="status-badge" id="statusBadge">
+        <span class="pulse-dot"></span>
+        <span id="statusText">Syncing Google Sheet...</span>
+      </div>
+      <button class="btn" id="configBtn">
+        ⚙️ Config Sheet
+      </button>
+    </div>
+  </header>
 
-<!-- =========================
-     HEADER
-========================= -->
+  <!-- Dashboard Overview Cards -->
+  <div class="dashboard-grid">
+    <!-- Moisture -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Soil Moisture</span>
+        <span class="card-icon">💧</span>
+      </div>
+      <div class="card-value" id="valMoisture">--%</div>
+      <div class="card-subtext">
+        Last: <span class="timestamp-badge" id="timeMoisture">--:--:--</span>
+      </div>
+    </div>
 
-<header>
+    <!-- Temperature -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Temperature</span>
+        <span class="card-icon">🌡️</span>
+      </div>
+      <div class="card-value" id="valTemp">--°C</div>
+      <div class="card-subtext">
+        Last: <span class="timestamp-badge" id="timeTemp">--:--:--</span>
+      </div>
+    </div>
 
-    <h1>🌱 Soil Sensor Dashboard</h1>
+    <!-- EC -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Elect. Conductivity</span>
+        <span class="card-icon">⚡</span>
+      </div>
+      <div class="card-value" id="valEC">-- uS/cm</div>
+      <div class="card-subtext">
+        Last: <span class="timestamp-badge" id="timeEC">--:--:--</span>
+      </div>
+    </div>
 
-    <p>
-        Live soil and environmental measurements
-    </p>
+    <!-- pH Level -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">pH Level</span>
+        <span class="card-icon">🧪</span>
+      </div>
+      <div class="card-value" id="valPH">--</div>
+      <div class="card-subtext">
+        Last: <span class="timestamp-badge" id="timePH">--:--:--</span>
+      </div>
+    </div>
 
-</header>
+    <!-- Time Series Line Chart (Moisture, Temp, EC) -->
+    <div class="card col-span-2 chart-card">
+      <div class="card-header">
+        <span class="card-title">Environmental Telemetry (Timestamped)</span>
+        <span class="timestamp-badge" id="chartRangeBadge">Live Feed</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="envChart"></canvas>
+      </div>
+    </div>
 
+    <!-- NPK Nitrogen, Phosphorus, Potassium Chart -->
+    <div class="card col-span-2 chart-card">
+      <div class="card-header">
+        <span class="card-title">NPK Nutrients (mg/kg)</span>
+        <span class="timestamp-badge" id="npkTimestamp">Latest Data</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="npkChart"></canvas>
+      </div>
+    </div>
 
-<!-- =========================
-     STATUS
-========================= -->
+    <!-- Live Telemetry Data Log Table -->
+    <div class="card col-span-4">
+      <div class="card-header">
+        <span class="card-title">Spreadsheet Telemetry History Log</span>
+        <span class="timestamp-badge" id="logCountBadge">0 Records</span>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp 🕒</th>
+              <th>Moisture (%)</th>
+              <th>Temp (°C)</th>
+              <th>EC (µS/cm)</th>
+              <th>pH</th>
+              <th>Nitrogen (N)</th>
+              <th>Phosphorus (P)</th>
+              <th>Potassium (K)</th>
+            </tr>
+          </thead>
+          <tbody id="telemetryTableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted);">Waiting for spreadsheet data...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-<div id="status">
+  <!-- Spreadsheet Configuration Modal -->
+  <div class="modal-overlay" id="configModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Google Sheet Connection</h2>
+        <button class="close-modal" id="closeModalBtn">&times;</button>
+      </div>
 
-    Loading Google Sheet...
+      <div class="help-box">
+        💡 <strong>How to publish your Google Sheet:</strong><br/>
+        1. Open your Google Sheet → Go to <em>File</em> → <em>Share</em> → <em>Publish to web</em>.<br/>
+        2. Select <strong>Entire Document</strong> (or your sheet tab) and change output format to <strong>Comma-separated values (.csv)</strong>.<br/>
+        3. Copy and paste the link below!
+      </div>
 
-</div>
+      <div class="form-group">
+        <label for="csvUrlInput">Google Sheet Published CSV URL:</label>
+        <input type="text" id="csvUrlInput" placeholder="https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/export?format=cvs&gid=2009997265" />
+      </div>
 
+      <div class="form-group">
+        <label for="refreshInterval">Auto Sync Frequency:</label>
+        <select id="refreshInterval">
+          <option value="5000">Every 5 Seconds</option>
+          <option value="10000" selected>Every 10 Seconds</option>
+          <option value="30000">Every 30 Seconds</option>
+          <option value="60000">Every 1 Minute</option>
+        </select>
+      </div>
 
-<!-- =========================
-     ERROR
-========================= -->
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="demoModeCheckbox" style="width: auto; margin-right: 8px;">
+          Use Simulated Demo Live Data (If Sheet URL empty)
+        </label>
+      </div>
 
-<div id="error"></div>
+      <button class="btn" id="saveConfigBtn" style="width: 100%; justify-content: center;">Save & Re-Sync</button>
+    </div>
+  </div>
 
+  <!-- Dashboard Script Engine -->
+  <script>
+    // Configuration & State Management
+    const STORAGE_KEY_URL = 'aiot_sheet_csv_url';
+    const STORAGE_KEY_INTERVAL = 'aiot_refresh_interval';
+    
+    let csvUrl = localStorage.getItem(STORAGE_KEY_URL) || '';
+    let syncInterval = parseInt(localStorage.getItem(STORAGE_KEY_INTERVAL) || '10000', 10);
+    let syncTimer = null;
 
-<!-- =========================
-     LATEST VALUES
-========================= -->
+    // Charts references
+    let envChart = null;
+    let npkChart = null;
 
-<div
-    id="latestValues"
-    class="latest-container">
-</div>
+    // Sample fallback data if CSV is not provided yet
+    const generateMockData = () => {
+      const records = [];
+      const now = new Date();
+      for (let i = 15; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60000);
+        const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        records.push({
+          timestamp: timeStr,
+          moisture: (45 + Math.sin(i * 0.5) * 5 + Math.random() * 2).toFixed(1),
+          temp: (24.2 + Math.cos(i * 0.3) * 1.5 + Math.random() * 0.5).toFixed(1),
+          ec: Math.round(1200 + Math.sin(i) * 80 + Math.random() * 20),
+          ph: (6.5 + (Math.random() * 0.4 - 0.2)).toFixed(2),
+          nitrogen: Math.round(48 + Math.random() * 4),
+          phosphorus: Math.round(22 + Math.random() * 3),
+          potassium: Math.round(180 + Math.random() * 10)
+        });
+      }
+      return records;
+    };
 
+    // CSV Parser helper
+    function parseCSV(csvText) {
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) return [];
 
-<!-- =========================
-     GRAPHS
-========================= -->
+      // Extract Headers
+      const headers = lines[0].split(',').map(h => h.replace(/^["']|["']$/g, '').trim().toLowerCase());
+      
+      // Match column indexes dynamically based on header names
+      const findIdx = (keywords) => headers.findIndex(h => keywords.some(k => h.includes(k)));
 
-<div
-    id="dashboard"
-    class="dashboard">
-</div>
+      const idxTime = findIdx(['time', 'date', 'timestamp', 'clock']);
+      const idxMoist = findIdx(['moist', 'water', 'humidity']);
+      const idxTemp = findIdx(['temp', 'celsius', 'temperature']);
+      const idxEC = findIdx(['ec', 'conduct', 'electric']);
+      const idxPH = findIdx(['ph']);
+      const idxN = findIdx(['nitrogen', 'n', 'nitro']);
+      const idxP = findIdx(['phos', 'p', 'phosphorus']);
+      const idxK = findIdx(['potass', 'k', 'potassium']);
 
+      const records = [];
 
-<script>
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.replace(/^["']|["']$/g, '').trim());
+        if (cols.length < headers.length) continue;
 
+        records.push({
+          timestamp: idxTime !== -1 ? cols[idxTime] : `Entry #${i}`,
+          moisture: idxMoist !== -1 ? parseFloat(cols[idxMoist]) || 0 : 0,
+          temp: idxTemp !== -1 ? parseFloat(cols[idxTemp]) || 0 : 0,
+          ec: idxEC !== -1 ? parseFloat(cols[idxEC]) || 0 : 0,
+          ph: idxPH !== -1 ? parseFloat(cols[idxPH]) || 0 : 0,
+          nitrogen: idxN !== -1 ? parseFloat(cols[idxN]) || 0 : 0,
+          phosphorus: idxP !== -1 ? parseFloat(cols[idxP]) || 0 : 0,
+          potassium: idxK !== -1 ? parseFloat(cols[idxK]) || 0 : 0,
+        });
+      }
 
-// ============================================================
-// GOOGLE SHEET
-// ============================================================
-
-const GOOGLE_SHEET_URL =
-    "https://docs.google.com/spreadsheets/d/18z7o8TwWY8zy7VOrvGsZTIjS-y0ri6oGuPGudrozrl4/export?format=xlsx&gid=2009997265";
-
-
-// ============================================================
-// CHART STORAGE
-// ============================================================
-
-const charts = {};
-
-
-// ============================================================
-// ROUND NUMBERS
-// ============================================================
-
-function roundNumber(value, decimals = 2) {
-
-    if (
-        value === null ||
-        value === undefined ||
-        value === ""
-    ) {
-
-        return null;
-
+      return records;
     }
 
-
-    const number =
-        Number(value);
-
-
-    if (!Number.isFinite(number)) {
-
-        return value;
-
-    }
-
-
-    return Number(
-        number.toFixed(decimals)
-    );
-
-}
-
-
-// ============================================================
-// FORMAT NUMBER FOR DISPLAY
-// ============================================================
-
-function formatNumber(value) {
-
-    if (
-        value === null ||
-        value === undefined ||
-        value === ""
-    ) {
-
-        return "N/A";
-
-    }
-
-
-    const number =
-        Number(value);
-
-
-    if (!Number.isFinite(number)) {
-
-        return value;
-
-    }
-
-
-    /*
-        Automatically choose a reasonable
-        number of decimal places.
-
-        >= 1000   → whole number
-        >= 100    → 1 decimal
-        >= 10     → 2 decimals
-        >= 1      → 2 decimals
-        < 1       → 3 decimals
-    */
-
-    let decimals;
-
-
-    const absolute =
-        Math.abs(number);
-
-
-    if (absolute >= 1000) {
-
-        decimals = 0;
-
-    }
-
-    else if (absolute >= 100) {
-
-        decimals = 1;
-
-    }
-
-    else if (absolute >= 1) {
-
-        decimals = 2;
-
-    }
-
-    else {
-
-        decimals = 3;
-
-    }
-
-
-    return Number(
-        number.toFixed(decimals)
-    ).toString();
-
-}
-
-
-// ============================================================
-// LOAD GOOGLE SHEET
-// ============================================================
-
-async function loadGoogleSheet() {
-
-    try {
-
-        showStatus(
-            "Downloading latest Google Sheet data..."
-        );
-
-        hideError();
-
-
-        // ----------------------------------------------------
-        // Download XLSX
-        // ----------------------------------------------------
-
-        const response =
-            await fetch(
-                GOOGLE_SHEET_URL
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                `Google Sheets returned HTTP ${response.status}`
-            );
-
-        }
-
-
-        // ----------------------------------------------------
-        // Convert response into ArrayBuffer
-        // ----------------------------------------------------
-
-        const arrayBuffer =
-            await response.arrayBuffer();
-
-
-        // ----------------------------------------------------
-        // Read XLSX
-        // ----------------------------------------------------
-
-        const workbook =
-            XLSX.read(
-
-                arrayBuffer,
-
-                {
-                    type: "array"
-                }
-
-            );
-
-
-        console.log(
-            "Available sheets:",
-            workbook.SheetNames
-        );
-
-
-        // ----------------------------------------------------
-        // Get first sheet
-        // ----------------------------------------------------
-
-        const sheetName =
-            workbook.SheetNames[0];
-
-
-        const worksheet =
-            workbook.Sheets[
-                sheetName
-            ];
-
-
-        if (!worksheet) {
-
-            throw new Error(
-                "Could not find a worksheet."
-            );
-
-        }
-
-
-        // ----------------------------------------------------
-        // Convert worksheet to JSON
-        // ----------------------------------------------------
-
-        const data =
-            XLSX.utils.sheet_to_json(
-
-                worksheet,
-
-                {
-                    defval: null
-                }
-
-            );
-
-
-        console.log(
-            "Raw data:",
-            data
-        );
-
-
-        // ----------------------------------------------------
-        // Check data
-        // ----------------------------------------------------
-
-        if (!data.length) {
-
-            throw new Error(
-                "The Google Sheet contains no data."
-            );
-
-        }
-
-
-        console.log(
-            "Columns:",
-            Object.keys(data[0])
-        );
-
-
-        // ----------------------------------------------------
-        // Create dashboard
-        // ----------------------------------------------------
-
-        createLatestValues(
-            data
-        );
-
-
-        createGraphs(
-            data
-        );
-
-
-        showStatus(
-
-            `Loaded ${data.length} measurements • Last updated ${new Date().toLocaleTimeString()}`
-
-        );
-
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "ERROR:",
-            error
-        );
-
-
-        showError(
-            "Could not load Google Sheet: " +
-            error.message
-        );
-
-
-        showStatus(
-            "Failed to load data."
-        );
-
-    }
-
-}
-
-
-// ============================================================
-// FIND TIME COLUMN
-// ============================================================
-
-function findTimeColumn(data) {
-
-    const columns =
-        Object.keys(
-            data[0]
-        );
-
-
-    if (
-        columns.includes(
-            "Time"
-        )
-    ) {
-
-        return "Time";
-
-    }
-
-
-    const timeColumn =
-        columns.find(
-
-            column =>
-                column
-                    .toLowerCase()
-                    .includes("time")
-
-        );
-
-
-    return (
-        timeColumn ||
-        columns[0]
-    );
-
-}
-
-
-// ============================================================
-// CHECK IF NUMERIC
-// ============================================================
-
-function isNumeric(value) {
-
-    if (
-
-        value === null ||
-
-        value === undefined ||
-
-        value === ""
-
-    ) {
-
-        return false;
-
-    }
-
-
-    const number =
-        Number(value);
-
-
-    return Number.isFinite(
-        number
-    );
-
-}
-
-
-// ============================================================
-// FIND NUMERIC COLUMNS
-// ============================================================
-
-function findNumericColumns(data) {
-
-    const columns =
-        Object.keys(
-            data[0]
-        );
-
-
-    const timeColumn =
-        findTimeColumn(
-            data
-        );
-
-
-    return columns.filter(
-
-        column => {
-
-
-            // Don't graph Time
-
-            if (
-                column === timeColumn
-            ) {
-
-                return false;
-
-            }
-
-
-            const values =
-                data
-
-                    .map(
-                        row =>
-                            row[column]
-                    )
-
-                    .filter(
-
-                        value =>
-                            value !== null &&
-                            value !== undefined &&
-                            value !== ""
-
-                    );
-
-
-            if (!values.length) {
-
-                return false;
-
-            }
-
-
-            const numericCount =
-                values.filter(
-                    isNumeric
-                ).length;
-
-
-            return (
-
-                numericCount /
-                values.length
-
-            ) >= 0.5;
-
-        }
-
-    );
-
-}
-
-
-// ============================================================
-// GET UNIT
-// ============================================================
-
-function getUnit(
-    columnName
-) {
-
-    const match =
-        columnName.match(
-            /\(([^)]+)\)/
-        );
-
-
-    if (match) {
-
-        return match[1];
-
-    }
-
-
-    return "";
-
-}
-
-
-// ============================================================
-// GET CLEAN LABEL
-// ============================================================
-
-function getLabel(
-    columnName
-) {
-
-    return columnName
-
-        .replace(
-            /\s*\([^)]*\)/g,
-            ""
-        )
-
-        .trim();
-
-}
-
-
-// ============================================================
-// CREATE LATEST VALUES
-// ============================================================
-
-function createLatestValues(
-    data
-) {
-
-    const container =
-        document.getElementById(
-            "latestValues"
-        );
-
-
-    const latest =
-        data[
-            data.length - 1
-        ];
-
-
-    const timeColumn =
-        findTimeColumn(
-            data
-        );
-
-
-    const numericColumns =
-        findNumericColumns(
-            data
-        );
-
-
-    let html = "";
-
-
-    // ----------------------------------------------------
-    // Time
-    // ----------------------------------------------------
-
-    html += `
-
-        <div class="stat-card">
-
-            <div class="stat-label">
-                Latest Reading
-            </div>
-
-            <div class="stat-value">
-
-                ${
-                    latest[timeColumn] ??
-                    "N/A"
-                }
-
-            </div>
-
-        </div>
-
-    `;
-
-
-    // ----------------------------------------------------
-    // Measurements
-    // ----------------------------------------------------
-
-    numericColumns.forEach(
-
-        column => {
-
-
-            const value =
-                latest[column];
-
-
-            const unit =
-                getUnit(
-                    column
-                );
-
-
-            html += `
-
-                <div class="stat-card">
-
-                    <div class="stat-label">
-
-                        ${getLabel(column)}
-
-                    </div>
-
-
-                    <div class="stat-value">
-
-                        ${
-                            formatNumber(
-                                value
-                            )
-                        }
-
-                        ${
-                            unit
-                                ? " " + unit
-                                : ""
-                        }
-
-                    </div>
-
-                </div>
-
-            `;
-
-        }
-
-    );
-
-
-    container.innerHTML =
-        html;
-
-}
-
-
-// ============================================================
-// CREATE GRAPHS
-// ============================================================
-
-function createGraphs(
-    data
-) {
-
-    const dashboard =
-        document.getElementById(
-            "dashboard"
-        );
-
-
-    dashboard.innerHTML =
-        "";
-
-
-    const timeColumn =
-        findTimeColumn(
-            data
-        );
-
-
-    const numericColumns =
-        findNumericColumns(
-            data
-        );
-
-
-    console.log(
-        "Numeric columns:",
-        numericColumns
-    );
-
-
-    numericColumns.forEach(
-
-        (
-            column,
-            index
-        ) => {
-
-
-            const chartID =
-                `chart_${index}`;
-
-
-            const label =
-                getLabel(
-                    column
-                );
-
-
-            const unit =
-                getUnit(
-                    column
-                );
-
-
-            // ------------------------------------------------
-            // Create card
-            // ------------------------------------------------
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "chart-card";
-
-
-            card.innerHTML = `
-
-                <h2>
-
-                    ${getIcon(column)}
-
-                    ${label}
-
-                </h2>
-
-
-                <div
-                    class="chart-container"
-                >
-
-                    <canvas
-                        id="${chartID}">
-                    </canvas>
-
-                </div>
-
-            `;
-
-
-            dashboard.appendChild(
-                card
-            );
-
-
-            // ------------------------------------------------
-            // X values
-            // ------------------------------------------------
-
-            const labels =
-                data.map(
-
-                    row =>
-                        row[
-                            timeColumn
-                        ]
-
-                );
-
-
-            // ------------------------------------------------
-            // Y values
-            //
-            // Keep the actual data values
-            // for accurate graphs.
-            // ------------------------------------------------
-
-            const values =
-                data.map(
-
-                    row => {
-
-                        const value =
-                            Number(
-                                row[column]
-                            );
-
-
-                        if (
-                            Number.isFinite(
-                                value
-                            )
-                        ) {
-
-                            return value;
-
-                        }
-
-
-                        return null;
-
-                    }
-
-                );
-
-
-            // ------------------------------------------------
-            // Create chart
-            // ------------------------------------------------
-
-            createChart(
-
-                chartID,
-
-                labels,
-
-                values,
-
-                label,
-
-                unit
-
-            );
-
-        }
-
-    );
-
-
-    if (
-        !numericColumns.length
-    ) {
-
-        dashboard.innerHTML = `
-
-            <div class="chart-card">
-
-                <h2>
-                    No numeric data found
-                </h2>
-
-                <p>
-                    Check the columns in your
-                    Google Sheet.
-                </p>
-
-            </div>
-
-        `;
-
-    }
-
-}
-
-
-// ============================================================
-// CREATE CHART
-// ============================================================
-
-function createChart(
-
-    chartID,
-
-    labels,
-
-    values,
-
-    label,
-
-    unit
-
-) {
-
-
-    const canvas =
-        document.getElementById(
-            chartID
-        );
-
-
-    // Destroy old chart
-
-    if (
-        charts[chartID]
-    ) {
-
-        charts[chartID].destroy();
-
-    }
-
-
-    charts[chartID] =
-        new Chart(
-
-            canvas,
-
+    // Initialize Charts
+    function initCharts() {
+      // Env Chart
+      const ctxEnv = document.getElementById('envChart').getContext('2d');
+      envChart = new Chart(ctxEnv, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
             {
-
-                type: "line",
-
-
-                data: {
-
-                    labels: labels,
-
-
-                    datasets: [
-
-                        {
-
-                            label:
-                                unit
-
-                                    ? `${label} (${unit})`
-
-                                    : label,
-
-
-                            // Use REAL values
-                            // for graph accuracy
-
-                            data: values,
-
-
-                            borderWidth: 2,
-
-
-                            tension: 0.25,
-
-
-                            fill: true,
-
-
-                            pointRadius: 2,
-
-
-                            pointHoverRadius: 6
-
-                        }
-
-                    ]
-
-                },
-
-
-                options: {
-
-                    responsive: true,
-
-
-                    maintainAspectRatio: false,
-
-
-                    interaction: {
-
-                        mode: "index",
-
-                        intersect: false
-
-                    },
-
-
-                    plugins: {
-
-                        legend: {
-
-                            display: true
-
-                        },
-
-
-                        tooltip: {
-
-                            callbacks: {
-
-                                label:
-                                    function(
-                                        context
-                                    ) {
-
-
-                                        const value =
-                                            context.parsed.y;
-
-
-                                        if (
-                                            value === null
-                                        ) {
-
-                                            return `${label}: No data`;
-
-                                        }
-
-
-                                        const rounded =
-                                            formatNumber(
-                                                value
-                                            );
-
-
-                                        return unit
-
-                                            ? `${label}: ${rounded} ${unit}`
-
-                                            : `${label}: ${rounded}`;
-
-                                    }
-
-                            }
-
-                        }
-
-                    },
-
-
-                    scales: {
-
-                        x: {
-
-                            title: {
-
-                                display: true,
-
-                                text: "Time"
-
-                            },
-
-
-                            ticks: {
-
-                                autoSkip: true,
-
-                                maxTicksLimit: 12,
-
-                                maxRotation: 45,
-
-                                minRotation: 45
-
-                            }
-
-                        },
-
-
-                        y: {
-
-                            beginAtZero: false,
-
-
-                            title: {
-
-                                display: true,
-
-
-                                text:
-
-                                    unit
-
-                                        ? `${label} (${unit})`
-
-                                        : label
-
-                            },
-
-
-                            ticks: {
-
-                                callback:
-                                    function(value) {
-
-                                        return formatNumber(
-                                            value
-                                        );
-
-                                    }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
+              label: 'Moisture (%)',
+              borderColor: '#00e699',
+              backgroundColor: 'rgba(0, 230, 153, 0.15)',
+              data: [],
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'Temp (°C)',
+              borderColor: '#ffb703',
+              backgroundColor: 'rgba(255, 183, 3, 0.15)',
+              data: [],
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'EC (µS/cm)',
+              borderColor: '#00bfff',
+              backgroundColor: 'rgba(0, 191, 255, 0.15)',
+              data: [],
+              fill: false,
+              yAxisID: 'y1',
+              tension: 0.4
             }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#8b9bb4', font: { family: 'Outfit' } } },
+            tooltip: {
+              callbacks: {
+                title: (items) => `Timestamp: ${items[0].label}`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y1: { position: 'right', ticks: { color: '#00bfff' }, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
 
-        );
-
-}
-
-
-// ============================================================
-// ICONS
-// ============================================================
-
-function getIcon(
-    column
-) {
-
-    const name =
-        column.toLowerCase();
-
-
-    if (
-        name.includes(
-            "moisture"
-        )
-    ) {
-
-        return "💧";
-
+      // NPK Chart
+      const ctxNPK = document.getElementById('npkChart').getContext('2d');
+      npkChart = new Chart(ctxNPK, {
+        type: 'bar',
+        data: {
+          labels: ['Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'],
+          datasets: [{
+            label: 'Nutrient Content (mg/kg)',
+            data: [0, 0, 0],
+            backgroundColor: [
+              'rgba(157, 78, 221, 0.8)',
+              'rgba(0, 230, 153, 0.8)',
+              'rgba(255, 183, 3, 0.8)'
+            ],
+            borderWidth: 1,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8b9bb4' }, grid: { display: false } },
+            y: { ticks: { color: '#8b9bb4' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          }
+        }
+      });
     }
 
+    // Update UI with Parsed Data Records
+    function updateDashboard(records) {
+      if (!records || records.length === 0) return;
 
-    if (
-        name.includes(
-            "temperature"
-        )
-    ) {
+      const latest = records[records.length - 1];
 
-        return "🌡️";
+      // Update KPI Cards & Timestamps
+      document.getElementById('valMoisture').innerText = `${latest.moisture}%`;
+      document.getElementById('timeMoisture').innerText = latest.timestamp;
 
+      document.getElementById('valTemp').innerText = `${latest.temp}°C`;
+      document.getElementById('timeTemp').innerText = latest.timestamp;
+
+      document.getElementById('valEC').innerText = `${latest.ec} µS/cm`;
+      document.getElementById('timeEC').innerText = latest.timestamp;
+
+      document.getElementById('valPH').innerText = latest.ph;
+      document.getElementById('timePH').innerText = latest.timestamp;
+
+      // Update Environment Time-Series Chart
+      const timestamps = records.map(r => r.timestamp);
+      envChart.data.labels = timestamps;
+      envChart.data.datasets[0].data = records.map(r => r.moisture);
+      envChart.data.datasets[1].data = records.map(r => r.temp);
+      envChart.data.datasets[2].data = records.map(r => r.ec);
+      envChart.update();
+
+      // Update NPK Chart with Latest Record
+      npkChart.data.datasets[0].data = [latest.nitrogen, latest.phosphorus, latest.potassium];
+      npkChart.update();
+      document.getElementById('npkTimestamp').innerText = `At ${latest.timestamp}`;
+
+      // Update Telemetry Log Table
+      const tableBody = document.getElementById('telemetryTableBody');
+      document.getElementById('logCountBadge').innerText = `${records.length} Records`;
+      
+      tableBody.innerHTML = records.slice().reverse().map(r => `
+        <tr>
+          <td><span class="timestamp-badge">${r.timestamp}</span></td>
+          <td style="color: var(--accent-green); font-weight:600;">${r.moisture}%</td>
+          <td>${r.temp}°C</td>
+          <td style="color: var(--accent-blue);">${r.ec} µS/cm</td>
+          <td>${r.ph}</td>
+          <td>${r.nitrogen} mg/kg</td>
+          <td>${r.phosphorus} mg/kg</td>
+          <td>${r.potassium} mg/kg</td>
+        </tr>
+      `).join('');
     }
 
+    // Fetch Spreadsheet / Mock Loop
+    async function fetchData() {
+      const statusText = document.getElementById('statusText');
+      const isDemo = document.getElementById('demoModeCheckbox').checked;
 
-    if (
-
-        name.includes("ec") ||
-
-        name.includes(
-            "conductivity"
-        )
-
-    ) {
-
-        return "⚡";
-
+      if (csvUrl && !isDemo) {
+        try {
+          statusText.innerText = 'Fetching Google Sheet...';
+          const response = await fetch(csvUrl);
+          if (!response.ok) throw new Error('Network error loading CSV');
+          const csvText = await response.text();
+          const records = parseCSV(csvText);
+          
+          if (records.length > 0) {
+            updateDashboard(records);
+            statusText.innerText = `Synced Live (${new Date().toLocaleTimeString()})`;
+          } else {
+            statusText.innerText = 'Sheet empty or invalid format';
+          }
+        } catch (err) {
+          console.error(err);
+          statusText.innerText = 'Sync failed. Falling back to demo mode.';
+          updateDashboard(generateMockData());
+        }
+      } else {
+        statusText.innerText = 'Using Simulated Live Telemetry';
+        updateDashboard(generateMockData());
+      }
     }
 
-
-    if (
-        name === "ph"
-    ) {
-
-        return "⚗️";
-
+    // Interval Management
+    function startSyncLoop() {
+      if (syncTimer) clearInterval(syncTimer);
+      fetchData();
+      syncTimer = setInterval(fetchData, syncInterval);
     }
 
+    // Event Listeners & Modal Logic
+    document.addEventListener('DOMContentLoaded', () => {
+      initCharts();
 
-    if (
-        name.includes(
-            "nitrogen"
-        )
-    ) {
+      const modal = document.getElementById('configModal');
+      const configBtn = document.getElementById('configBtn');
+      const closeModalBtn = document.getElementById('closeModalBtn');
+      const saveConfigBtn = document.getElementById('saveConfigBtn');
+      const csvInput = document.getElementById('csvUrlInput');
+      const intervalSelect = document.getElementById('refreshInterval');
+      const demoCheckbox = document.getElementById('demoModeCheckbox');
 
-        return "🧪";
+      csvInput.value = csvUrl;
+      intervalSelect.value = syncInterval;
+      demoCheckbox.checked = !csvUrl;
 
-    }
+      configBtn.onclick = () => modal.classList.add('active');
+      closeModalBtn.onclick = () => modal.classList.remove('active');
 
+      saveConfigBtn.onclick = () => {
+        csvUrl = csvInput.value.trim();
+        syncInterval = parseInt(intervalSelect.value, 10);
+        
+        localStorage.setItem(STORAGE_KEY_URL, csvUrl);
+        localStorage.setItem(STORAGE_KEY_INTERVAL, syncInterval);
+        
+        modal.classList.remove('active');
+        startSyncLoop();
+      };
 
-    if (
-        name.includes(
-            "phosphorus"
-        )
-    ) {
-
-        return "🧬";
-
-    }
-
-
-    if (
-        name.includes(
-            "potassium"
-        )
-    ) {
-
-        return "🍃";
-
-    }
-
-
-    return "📊";
-
-}
-
-
-// ============================================================
-// STATUS
-// ============================================================
-
-function showStatus(
-    message
-) {
-
-    document.getElementById(
-        "status"
-    ).textContent =
-        message;
-
-}
-
-
-// ============================================================
-// ERROR
-// ============================================================
-
-function showError(
-    message
-) {
-
-    const error =
-        document.getElementById(
-            "error"
-        );
-
-
-    error.textContent =
-        message;
-
-
-    error.style.display =
-        "block";
-
-}
-
-
-function hideError() {
-
-    const error =
-        document.getElementById(
-            "error"
-        );
-
-
-    error.style.display =
-        "none";
-
-}
-
-
-// ============================================================
-// INITIAL LOAD
-// ============================================================
-
-loadGoogleSheet();
-
-
-// ============================================================
-// REFRESH EVERY 30 SECONDS
-// ============================================================
-
-setInterval(
-
-    loadGoogleSheet,
-
-    30000
-
-);
-
-
-</script>
-
-
+      startSyncLoop();
+    });
+  </script>
 </body>
-
 </html>
